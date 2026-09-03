@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../context/useAuth'
-import { getSongs, createSong, deleteSong } from '../api/songs'
+import { getSongs, createSong, deleteSong, updateSong } from '../api/songs'
 import {
   getSetlists,
   createSetlist,
@@ -68,6 +68,7 @@ export default function Dashboard() {
   async function handleRemoveSong(setlistId, songId) { await removeSongFromSetlist(setlistId, songId); await loadData() }
   async function handleDeleteSetlist(setlistId) { await deleteSetlist(setlistId); await loadData() }
   async function handleDeleteSong(songId) { await deleteSong(songId); await loadData() }
+  async function handleUpdateSong(id, payload) { await updateSong(id, payload); await loadData() }
   async function handleReorder(setlistId, songIds) { await reorderSetlist(setlistId, songIds); await loadData() }
   async function handleShare(setlistId) { return generateShareToken(setlistId) }
 
@@ -166,7 +167,7 @@ export default function Dashboard() {
           {tab === 0 && (
             <>
               <SongForm onCreate={handleCreateSong} />
-              <SongList songs={songs} onDelete={handleDeleteSong} />
+              <SongList songs={songs} onDelete={handleDeleteSong} onUpdate={handleUpdateSong} />
             </>
           )}
 
