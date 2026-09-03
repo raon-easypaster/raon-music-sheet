@@ -10,6 +10,7 @@ import {
   reorderSetlist,
   generateShareToken,
 } from '../api/setlists'
+import { changePasswordRequest } from '../api/auth'
 import SongForm from '../components/SongForm'
 import SetlistForm from '../components/SetlistForm'
 import SongList from '../components/SongList'
@@ -28,6 +29,10 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tab, setTab] = useState(0)
+  const [showPwModal, setShowPwModal] = useState(false)
+  const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [pwMsg, setPwMsg] = useState('')
+  const [pwLoading, setPwLoading] = useState(false)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -64,6 +69,29 @@ export default function Dashboard() {
   async function handleReorder(setlistId, songIds) { await reorderSetlist(setlistId, songIds); await loadData() }
   async function handleShare(setlistId) { return generateShareToken(setlistId) }
 
+  async function handleChangePassword(e) {
+    e.preventDefault()
+    setPwMsg('')
+    if (pwForm.newPassword !== pwForm.confirmPassword) {
+      setPwMsg('새 비밀번호가 일치하지 않습니다')
+      return
+    }
+    setPwLoading(true)
+    try {
+      const res = await changePasswordRequest({
+        currentPassword: pwForm.currentPassword,
+        newPassword: pwForm.newPassword,
+      })
+      setPwMsg(res.message)
+      setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      setTimeout(() => setShowPwModal(false), 1500)
+    } catch (err) {
+      setPwMsg(err.message)
+    } finally {
+      setPwLoading(false)
+    }
+  }
+
   const selectedSetlist = setlists.find((s) => s._id === selectedSetlistId) || null
 
   return (
@@ -73,8 +101,47 @@ export default function Dashboard() {
           <h1>RAON music sheet</h1>
           <p className="muted">찬양팀 악보 & 콘티 관리</p>
         </div>
-        <button className="secondary" onClick={logout}>로그아웃</button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="secondary" onClick={() => { setShowPwModal(true); setPwMsg('') }}>비밀번호 변경</button>
+          <button className="secondary" onClick={logout}>로그아웃</button>
+        </div>
       </header>
+
+      {showPwModal && (
+        <div className="modal-overlay" onClick={() => setShowPwModal(false)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <h2>비밀번호 변경</h2>
+            <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <input
+                type="password"
+                placeholder="현재 비밀번호"
+                value={pwForm.currentPassword}
+                onChange={e => setPwForm(f => ({ ...f, currentPassword: e.target.value }))}
+                required
+              />
+              <input
+                type="password"
+                placeholder="새 비밀번호 (6자 이상)"
+                value={pwForm.newPassword}
+                onChange={e => setPwForm(f => ({ ...f, newPassword: e.target.value }))}
+                required
+              />
+              <input
+                type="password"
+                placeholder="새 비밀번호 확인"
+                value={pwForm.confirmPassword}
+                onChange={e => setPwForm(f => ({ ...f, confirmPassword: e.target.value }))}
+                required
+              />
+              {pwMsg && <p style={{ color: pwMsg.includes('변경되었') ? 'green' : 'red', margin: 0 }}>{pwMsg}</p>}
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button type="button" className="secondary" onClick={() => setShowPwModal(false)}>취소</button>
+                <button type="submit" disabled={pwLoading}>{pwLoading ? '변경 중...' : '변경'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {error ? <div className="card error-banner">{error}</div> : null}
 

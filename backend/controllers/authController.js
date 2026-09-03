@@ -53,6 +53,29 @@ exports.signup = async (req, res) => {
   }
 }
 
+exports.changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: '현재 비밀번호와 새 비밀번호를 입력해주세요' })
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: '비밀번호는 6자 이상이어야 합니다' })
+    }
+    const user = await User.findById(req.user._id)
+    const isMatch = await bcrypt.compare(currentPassword, user.password)
+    if (!isMatch) {
+      return res.status(400).json({ message: '현재 비밀번호가 올바르지 않습니다' })
+    }
+    const salt = await bcrypt.genSalt(10)
+    user.password = await bcrypt.hash(newPassword, salt)
+    await user.save()
+    res.json({ message: '비밀번호가 변경되었습니다' })
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}
+
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body

@@ -13,3 +13,10 @@ export function signupRequest(payload) {
     body: JSON.stringify(payload),
   })
 }
+
+export function changePasswordRequest(payload) {
+  return apiFetch('/auth/change-password', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
