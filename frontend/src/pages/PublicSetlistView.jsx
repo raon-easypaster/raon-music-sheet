@@ -241,11 +241,16 @@ function MobileSongSlider({ songs, currentIdx, onSelect }) {
 
 /* ── 악보 콘텐츠 (줌 컨트롤 포함) ──────────────────────────── */
 function SongContent({ song }) {
-  const [scale, setScale] = useState(1)
+  const [scale, setScale]     = useState(1)
+  const [fitted, setFitted]   = useState(true)   // true = 세로 맞춤(전체 보기), false = 가로 스케일
   const youtubeId = getYoutubeEmbedId(song.youtubeUrl)
 
-  // 곡이 바뀌면 줌 초기화
-  useEffect(() => { setScale(1) }, [song._id])
+  // 곡이 바뀌면 맞춤 모드로 초기화
+  useEffect(() => { setFitted(true); setScale(1) }, [song._id])
+
+  function handleFit()  { setFitted(true);  setScale(1) }
+  function handleMinus(){ setFitted(false); setScale(s => Math.max(0.4, +(s - 0.2).toFixed(1))) }
+  function handlePlus() { setFitted(false); setScale(s => Math.min(3,   +(s + 0.2).toFixed(1))) }
 
   return (
     <div className="card panel">
@@ -271,44 +276,51 @@ function SongContent({ song }) {
         <div className="viewer-section">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
             <h3 style={{ margin: 0 }}>악보</h3>
-            {/* 줌 컨트롤 */}
-            <div style={{ display: 'flex', gap: 5, marginLeft: 'auto' }}>
+            <div style={{ display: 'flex', gap: 5, marginLeft: 'auto', alignItems: 'center' }}>
               <button
                 className="secondary"
-                style={{ fontSize: 12, padding: '4px 10px' }}
-                onClick={() => setScale(1)}
-                title="화면 맞춤"
+                style={{ fontSize: 12, padding: '4px 10px', fontWeight: fitted ? 700 : 400, background: fitted ? '#15803d' : undefined, color: fitted ? '#fff' : undefined, border: 'none', borderRadius: 8, cursor: 'pointer' }}
+                onClick={handleFit}
+                title="악보 전체를 세로로 맞춤"
               >맞춤</button>
               <button
                 className="secondary"
                 style={{ fontSize: 16, padding: '4px 10px', lineHeight: 1 }}
-                onClick={() => setScale(s => Math.max(0.4, +(s - 0.2).toFixed(1)))}
+                onClick={handleMinus}
                 title="축소"
               >−</button>
               <span style={{ fontSize: 12, color: '#64748b', minWidth: 36, textAlign: 'center', lineHeight: '32px' }}>
-                {Math.round(scale * 100)}%
+                {fitted ? '맞춤' : `${Math.round(scale * 100)}%`}
               </span>
               <button
                 className="secondary"
                 style={{ fontSize: 16, padding: '4px 10px', lineHeight: 1 }}
-                onClick={() => setScale(s => Math.min(3, +(s + 0.2).toFixed(1)))}
+                onClick={handlePlus}
                 title="확대"
               >+</button>
             </div>
           </div>
-          <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '60vh', WebkitOverflowScrolling: 'touch' }}>
-            <img
-              src={song.sheetImageUrl}
-              alt="악보"
-              className="sheet-image"
-              style={{
-                display: 'block',
-                width: scale === 1 ? '100%' : `${scale * 100}%`,
-                maxWidth: 'none',
-                transformOrigin: 'top left',
-              }}
-            />
-          </div>
+
+          {fitted ? (
+            /* 세로 맞춤: 컨테이너 높이에 이미지 전체가 들어오도록 */
+            <div style={{ height: 'calc(100dvh - 260px)', minHeight: 200, overflow: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', justifyContent: 'center' }}>
+              <img
+                src={song.sheetImageUrl}
+                alt="악보"
+                style={{ height: '100%', width: 'auto', maxWidth: 'none', display: 'block', objectFit: 'contain' }}
+              />
+            </div>
+          ) : (
+            /* 가로 스케일 모드 */
+            <div style={{ overflowX: 'auto', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <img
+                src={song.sheetImageUrl}
+                alt="악보"
+                className="sheet-image"
+                style={{ display: 'block', width: `${scale * 100}%`, maxWidth: 'none' }}
+              />
+            </div>
+          )}
         </div>
       )}
 

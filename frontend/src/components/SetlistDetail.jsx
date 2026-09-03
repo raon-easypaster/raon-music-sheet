@@ -162,6 +162,13 @@ export default function SetlistDetail({
           <button type="button" className="secondary" style={{ fontSize: 12, padding: '4px 10px' }} onClick={copyLink}>
             {copied ? '복사됨!' : '복사'}
           </button>
+          <button
+            type="button"
+            style={{ fontSize: 12, padding: '4px 10px', background: '#15803d', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}
+            onClick={() => window.open(shareLink, '_blank')}
+          >
+            📺 진행하기
+          </button>
         </div>
       )}
 
