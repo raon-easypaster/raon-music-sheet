@@ -2,6 +2,9 @@ const mongoose = require('mongoose')
 const crypto = require('crypto')
 const Setlist = require('../models/Setlist')
 
+// In-memory current song index per share token (resets on server restart)
+const currentSongMap = new Map()
+
 // CREATE SETLIST
 exports.createSetlist = async (req, res) => {
   try {
@@ -174,6 +177,20 @@ exports.getPublicSetlist = async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: err.message })
   }
+}
+
+// GET current song index for public share
+exports.getPublicCurrentSong = async (req, res) => {
+  const index = currentSongMap.get(req.params.token) ?? 0
+  res.json({ index })
+}
+
+// SET current song index for public share (anyone with link can control)
+exports.setPublicCurrentSong = async (req, res) => {
+  const { index } = req.body
+  if (typeof index !== 'number') return res.status(400).json({ message: 'index required' })
+  currentSongMap.set(req.params.token, index)
+  res.json({ index })
 }
 
 exports.removeSongFromSetlist = async (req, res) => {

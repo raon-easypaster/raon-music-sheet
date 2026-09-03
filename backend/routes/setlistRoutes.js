@@ -12,10 +12,14 @@ const {
   reorderSongs,
   getShareToken,
   getPublicSetlist,
+  getPublicCurrentSong,
+  setPublicCurrentSong,
 } = require('../controllers/setlistController')
 
-// Public route (no auth)
+// Public routes (no auth)
 router.get('/public/:token', getPublicSetlist)
+router.get('/public/:token/current', getPublicCurrentSong)
+router.put('/public/:token/current', setPublicCurrentSong)
 
 // Protected routes
 router.post('/', protect, createSetlist)

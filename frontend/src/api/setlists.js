@@ -40,6 +40,18 @@ export function getPublicSetlist(token) {
   return apiFetch(`/setlists/public/${token}`, { skipAuth: true })
 }
 
+export function getPublicCurrentSong(token) {
+  return apiFetch(`/setlists/public/${token}/current`, { skipAuth: true })
+}
+
+export function setPublicCurrentSong(token, index) {
+  return apiFetch(`/setlists/public/${token}/current`, {
+    method: 'PUT',
+    skipAuth: true,
+    body: JSON.stringify({ index }),
+  })
+}
+
 export function deleteSetlist(id) {
   return apiFetch(`/setlists/${id}`, {
     method: 'DELETE',
