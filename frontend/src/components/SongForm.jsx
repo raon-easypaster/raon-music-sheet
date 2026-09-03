@@ -48,17 +48,14 @@ export default function SongForm({ onCreate }) {
           required
         />
         <a
-          href={form.title.trim() ? `https://www.google.com/search?q=${encodeURIComponent(form.title + ' 찬양 악보')}` : undefined}
+          href={`https://www.google.com/search?q=${encodeURIComponent((form.title.trim() || '찬양') + ' 악보')}`}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={e => { if (!form.title.trim()) e.preventDefault() }}
           style={{
-            flexShrink: 0, fontSize: 13, padding: '0 12px',
+            flexShrink: 0, fontSize: 13, padding: '0 14px',
             background: '#e2e8f0', borderRadius: 10, fontWeight: 600,
             display: 'flex', alignItems: 'center',
             textDecoration: 'none', color: '#1e293b',
-            opacity: form.title.trim() ? 1 : 0.4,
-            cursor: form.title.trim() ? 'pointer' : 'default',
           }}
         >
           🔍 구글
