@@ -181,15 +181,27 @@ exports.getPublicSetlist = async (req, res) => {
 
 // GET current song index for public share
 exports.getPublicCurrentSong = async (req, res) => {
-  const index = currentSongMap.get(req.params.token) ?? 0
-  res.json({ index })
+  const token = req.params.token
+  if (currentSongMap.has(token)) {
+    return res.json({ index: currentSongMap.get(token) })
+  }
+  try {
+    const setlist = await Setlist.findOne({ shareToken: token }, 'currentSongIdx')
+    const index = setlist ? (setlist.currentSongIdx ?? 0) : 0
+    currentSongMap.set(token, index)
+    res.json({ index })
+  } catch {
+    res.json({ index: 0 })
+  }
 }
 
 // SET current song index for public share (anyone with link can control)
 exports.setPublicCurrentSong = async (req, res) => {
   const { index } = req.body
   if (typeof index !== 'number') return res.status(400).json({ message: 'index required' })
-  currentSongMap.set(req.params.token, index)
+  const token = req.params.token
+  currentSongMap.set(token, index)
+  Setlist.updateOne({ shareToken: token }, { currentSongIdx: index }).catch(() => {})
   res.json({ index })
 }
 

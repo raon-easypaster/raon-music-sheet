@@ -41,6 +41,11 @@ const songSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    structure: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     notes: {
       type: String,
       trim: true,

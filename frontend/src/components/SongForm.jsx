@@ -3,7 +3,7 @@ import { useState } from 'react'
 const KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
                'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'A#m', 'Bm']
 
-const EMPTY = { title: '', artist: '', key: '', bpm: '', youtubeUrl: '', mrUrl: '', sheetImageUrl: '', sheetPdfUrl: '', notes: '' }
+const EMPTY = { title: '', artist: '', key: '', bpm: '', youtubeUrl: '', mrUrl: '', sheetImageUrl: '', sheetPdfUrl: '', structure: '', notes: '' }
 
 export default function SongForm({ onCreate }) {
   const [form, setForm] = useState(EMPTY)
@@ -119,6 +119,13 @@ export default function SongForm({ onCreate }) {
             name="sheetPdfUrl"
             placeholder="악보 PDF URL"
             value={form.sheetPdfUrl}
+            onChange={handleChange}
+          />
+          <input
+            type="text"
+            name="structure"
+            placeholder="송폼 구조 (예: Intro - Verse - Chorus - Bridge)"
+            value={form.structure}
             onChange={handleChange}
           />
           <textarea

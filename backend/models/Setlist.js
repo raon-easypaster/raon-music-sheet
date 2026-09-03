@@ -24,6 +24,10 @@ const setlistSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    currentSongIdx: {
+      type: Number,
+      default: 0,
+    },
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

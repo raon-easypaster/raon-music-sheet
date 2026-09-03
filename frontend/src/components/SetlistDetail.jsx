@@ -13,6 +13,7 @@ export default function SetlistDetail({
   const [submitting, setSubmitting] = useState(false)
   const [shareLink, setShareLink] = useState(null)
   const [copied, setCopied] = useState(false)
+  const [summaryCopied, setSummaryCopied] = useState(false)
 
   // drag state
   const dragIndex = useRef(null)
@@ -115,6 +116,23 @@ export default function SetlistDetail({
     setTimeout(() => setCopied(false), 2000)
   }
 
+  function copySummary() {
+    if (!setlist) return
+    const lines = [`📋 ${setlist.name}`, '']
+    localSongs.forEach((s, i) => {
+      let line = `${i + 1}. ${s.title}`
+      if (s.artist) line += ` (${s.artist})`
+      if (s.key) line += ` | Key ${s.key}`
+      if (s.bpm > 0) line += ` | BPM ${s.bpm}`
+      if (s.structure) line += `\n   ${s.structure}`
+      lines.push(line)
+    })
+    if (shareLink) { lines.push(''); lines.push(`🔗 ${shareLink}`) }
+    navigator.clipboard.writeText(lines.join('\n'))
+    setSummaryCopied(true)
+    setTimeout(() => setSummaryCopied(false), 2000)
+  }
+
   if (!setlist) {
     return (
       <div className="card panel">
@@ -126,11 +144,16 @@ export default function SetlistDetail({
 
   return (
     <div className="card panel">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8, flexWrap: 'wrap' }}>
         <h2 style={{ margin: 0 }}>{setlist.name}</h2>
-        <button type="button" className="secondary" style={{ fontSize: 13 }} onClick={handleShare}>
-          🔗 공유 링크
-        </button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button type="button" className="secondary" style={{ fontSize: 13 }} onClick={copySummary}>
+            {summaryCopied ? '복사됨!' : '💬 카톡 요약'}
+          </button>
+          <button type="button" className="secondary" style={{ fontSize: 13 }} onClick={handleShare}>
+            🔗 공유 링크
+          </button>
+        </div>
       </div>
 
       {shareLink && (

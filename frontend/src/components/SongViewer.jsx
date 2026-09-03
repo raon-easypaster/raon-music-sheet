@@ -29,6 +29,12 @@ export default function SongViewer({ song, onClose }) {
           <button className="secondary" onClick={onClose}>닫기</button>
         </div>
 
+        {song.structure && (
+          <div className="viewer-notes" style={{ marginBottom: 8 }}>
+            <strong>송폼</strong>
+            <p style={{ fontFamily: 'monospace', letterSpacing: '0.03em' }}>{song.structure}</p>
+          </div>
+        )}
         {song.notes && (
           <div className="viewer-notes">
             <strong>메모</strong>

@@ -18,8 +18,9 @@ import SetlistList from '../components/SetlistList'
 import SetlistDetail from '../components/SetlistDetail'
 import TeamPanel from '../components/TeamPanel'
 import HelpPage from '../components/HelpPage'
+import PracticeTools from '../components/PracticeTools'
 
-const TABS = ['곡 목록', '콘티', '팀', '사용법']
+const TABS = ['곡 목록', '콘티', '팀', '연습 도구', '사용법']
 
 export default function Dashboard() {
   const { logout } = useAuth()
@@ -192,7 +193,8 @@ export default function Dashboard() {
           )}
 
           {tab === 2 && <TeamPanel />}
-          {tab === 3 && <HelpPage />}
+          {tab === 3 && <PracticeTools />}
+          {tab === 4 && <HelpPage />}
         </>
       )}
     </div>

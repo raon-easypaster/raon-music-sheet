@@ -386,4 +386,9 @@ button:hover {
   .content-grid { grid-template-columns: 1fr; }
   .conti-grid { grid-template-columns: 1fr; }
   .share-grid { grid-template-columns: 1fr !important; }
+  .tools-grid { grid-template-columns: 1fr !important; }
+}
+
+@media (max-width: 1024px) {
+  .tools-grid { grid-template-columns: 1fr 1fr !important; }
 }
