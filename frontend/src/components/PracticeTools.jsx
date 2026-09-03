@@ -14,42 +14,57 @@ function transposeKey(key, semitones) {
   return isMinor ? newBase + 'm' : newBase
 }
 
+const TIME_SIGS = [
+  { beats: 4, label: '4/4', desc: '기본 박자' },
+  { beats: 3, label: '3/4', desc: '왈츠' },
+  { beats: 6, label: '6/8', desc: '6박' },
+  { beats: 2, label: '2/4', desc: '2박' },
+]
+
 // ── 메트로놈 ──────────────────────────────────────────
 function Metronome() {
   const [bpm, setBpm] = useState(100)
   const [running, setRunning] = useState(false)
-  const [beat, setBeat] = useState(false)
+  const [currentBeat, setCurrentBeat] = useState(-1)
+  const [timeSig, setTimeSig] = useState(4)
   const [tapTimes, setTapTimes] = useState([])
   const intervalRef = useRef(null)
   const audioCtx = useRef(null)
+  const beatCountRef = useRef(0)
 
   function getCtx() {
     if (!audioCtx.current) audioCtx.current = new (window.AudioContext || window.webkitAudioContext)()
     return audioCtx.current
   }
 
-  function tick() {
+  function playTick(isAccent) {
     const ctx = getCtx()
     const o = ctx.createOscillator()
     const g = ctx.createGain()
     o.connect(g); g.connect(ctx.destination)
-    o.frequency.value = 880
-    g.gain.setValueAtTime(0.3, ctx.currentTime)
+    o.frequency.value = isAccent ? 1047 : 880
+    g.gain.setValueAtTime(isAccent ? 0.5 : 0.3, ctx.currentTime)
     g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05)
     o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.05)
-    setBeat(true)
-    setTimeout(() => setBeat(false), 80)
   }
 
   useEffect(() => {
     if (running) {
-      tick()
-      intervalRef.current = setInterval(tick, (60 / bpm) * 1000)
+      beatCountRef.current = 0
+      const fire = () => {
+        const b = beatCountRef.current
+        playTick(b === 0)
+        setCurrentBeat(b)
+        beatCountRef.current = (b + 1) % timeSig
+      }
+      fire()
+      intervalRef.current = setInterval(fire, (60 / bpm) * 1000)
     } else {
       clearInterval(intervalRef.current)
+      setCurrentBeat(-1)
     }
     return () => clearInterval(intervalRef.current)
-  }, [running, bpm])
+  }, [running, bpm, timeSig])
 
   function handleTap() {
     const now = Date.now()
@@ -64,32 +79,67 @@ function Metronome() {
     })
   }
 
+  const beatSize = Math.max(36, Math.min(60, Math.floor(220 / timeSig)))
+
   return (
     <div className="card panel" style={{ textAlign: 'center' }}>
       <h3 style={{ marginTop: 0 }}>🥁 메트로놈</h3>
 
-      <div style={{
-        width: 80, height: 80, borderRadius: '50%', margin: '0 auto 20px',
-        background: beat ? '#15803d' : '#e2e8f0',
-        transition: 'background 0.05s',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 28
-      }}>♩</div>
+      {/* 박자 시각화 */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+        {Array.from({ length: timeSig }, (_, i) => (
+          <div
+            key={i}
+            style={{
+              width: beatSize, height: beatSize, borderRadius: '50%',
+              background: running && currentBeat === i
+                ? (i === 0 ? '#14532d' : '#15803d')
+                : '#e2e8f0',
+              border: i === 0 ? '2px solid #15803d' : '2px solid transparent',
+              transition: 'background 0.05s',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 14, fontWeight: 700,
+              color: running && currentBeat === i ? '#fff' : '#94a3b8',
+            }}
+          >
+            {i + 1}
+          </div>
+        ))}
+      </div>
 
       <div style={{ fontSize: 42, fontWeight: 800, color: '#14532d', marginBottom: 4 }}>{bpm}</div>
-      <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 20 }}>BPM</div>
+      <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 14 }}>BPM</div>
 
       <input
-        type="range" min="40" max="220" value={bpm}
+        type="range" min="40" max="240" value={bpm}
         onChange={e => setBpm(Number(e.target.value))}
-        style={{ width: '100%', marginBottom: 16 }}
+        style={{ width: '100%', marginBottom: 12 }}
       />
 
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 12 }}>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 14 }}>
         <button className="secondary" style={{ fontSize: 13 }} onClick={() => setBpm(b => Math.max(40, b - 5))}>−5</button>
         <button className="secondary" style={{ fontSize: 13 }} onClick={() => setBpm(b => Math.max(40, b - 1))}>−1</button>
-        <button className="secondary" style={{ fontSize: 13 }} onClick={() => setBpm(b => Math.min(220, b + 1))}>+1</button>
-        <button className="secondary" style={{ fontSize: 13 }} onClick={() => setBpm(b => Math.min(220, b + 5))}>+5</button>
+        <button className="secondary" style={{ fontSize: 13 }} onClick={() => setBpm(b => Math.min(240, b + 1))}>+1</button>
+        <button className="secondary" style={{ fontSize: 13 }} onClick={() => setBpm(b => Math.min(240, b + 5))}>+5</button>
+      </div>
+
+      {/* 박자 선택 */}
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+        {TIME_SIGS.map(ts => (
+          <button
+            key={ts.beats}
+            onClick={() => { setTimeSig(ts.beats); setRunning(false) }}
+            style={{
+              padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600,
+              background: timeSig === ts.beats ? '#15803d' : '#f1f5f9',
+              color: timeSig === ts.beats ? '#fff' : '#374151',
+              border: 'none', cursor: 'pointer',
+            }}
+            title={ts.desc}
+          >
+            {ts.label}
+          </button>
+        ))}
       </div>
 
       <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
@@ -100,7 +150,7 @@ function Metronome() {
           {running ? '■ 정지' : '▶ 시작'}
         </button>
         <button className="secondary" onClick={handleTap} style={{ minWidth: 80 }}>
-          👆 탭
+          👆 탭 템포
         </button>
       </div>
       <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>탭 버튼을 여러 번 눌러 BPM 자동 측정</p>
@@ -177,6 +227,15 @@ function CapoCalc() {
     </div>
   )
 }
+
+const GUITAR_STRINGS = [
+  { string: 6, note: 'E', octave: 2, freq: 82.41 },
+  { string: 5, note: 'A', octave: 2, freq: 110.00 },
+  { string: 4, note: 'D', octave: 3, freq: 146.83 },
+  { string: 3, note: 'G', octave: 3, freq: 196.00 },
+  { string: 2, note: 'B', octave: 3, freq: 246.94 },
+  { string: 1, note: 'E', octave: 4, freq: 329.63 },
+]
 
 // ── 크로매틱 튜너 ─────────────────────────────────────
 function autoCorrelate(buf, sampleRate) {
@@ -314,6 +373,31 @@ function Tuner() {
         {active ? '■ 끄기' : '🎤 시작'}
       </button>
       <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>마이크에 악기 소리를 내주세요</p>
+
+      {/* 기타 표준 튜닝 참조 */}
+      <div style={{ marginTop: 20, borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 8 }}>기타 표준 튜닝</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+          {GUITAR_STRINGS.map(s => {
+            const isMatch = active && detected?.note === s.note && detected?.octave === s.octave
+            return (
+              <div
+                key={s.string}
+                style={{
+                  padding: '8px 6px', borderRadius: 8, textAlign: 'center',
+                  background: isMatch ? '#f0fdf4' : '#f8fafc',
+                  border: `1px solid ${isMatch ? '#86efac' : '#e2e8f0'}`,
+                  transition: 'all 0.2s',
+                }}
+              >
+                <div style={{ fontSize: 10, color: '#94a3b8' }}>{s.string}번줄</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: isMatch ? '#15803d' : '#1e293b' }}>{s.note}{s.octave}</div>
+                <div style={{ fontSize: 10, color: '#94a3b8' }}>{s.freq.toFixed(2)} Hz</div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }

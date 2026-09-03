@@ -43,6 +43,7 @@ export default function SongList({ songs, onDelete, onUpdate }) {
       artist:        song.artist        || '',
       key:           song.key           || '',
       bpm:           song.bpm           || '',
+      capo:          song.capo          ?? 0,
       youtubeUrl:    song.youtubeUrl    || '',
       mrUrl:         song.mrUrl         || '',
       sheetImageUrl: song.sheetImageUrl || '',
@@ -63,6 +64,7 @@ export default function SongList({ songs, onDelete, onUpdate }) {
     try {
       const payload = { ...editForm }
       if (payload.bpm) payload.bpm = Number(payload.bpm)
+      payload.capo = Number(payload.capo) || 0
       await onUpdate(editing._id, payload)
       closeEdit()
     } catch (err) {
@@ -122,6 +124,7 @@ export default function SongList({ songs, onDelete, onUpdate }) {
               <span className="muted">{song.artist}</span>
               <div className="badge-row">
                 {song.key           && <span className="badge badge-key">{song.key}</span>}
+                {song.capo > 0      && <span className="badge" style={{ background: '#fef9c3', color: '#854d0e' }}>카포 {song.capo}</span>}
                 {song.bpm > 0       && <span className="badge badge-bpm">{song.bpm} BPM</span>}
                 {song.youtubeUrl    && <span className="badge badge-link">YT</span>}
                 {song.sheetImageUrl && <span className="badge badge-link">악보</span>}
@@ -161,6 +164,10 @@ export default function SongList({ songs, onDelete, onUpdate }) {
                   type="number" placeholder="BPM"
                   value={editForm.bpm} onChange={set('bpm')} min="1" max="300"
                 />
+                <select value={editForm.capo} onChange={set('capo')}>
+                  <option value={0}>카포 없음</option>
+                  {[1,2,3,4,5,6,7].map(n => <option key={n} value={n}>카포 {n}프렛</option>)}
+                </select>
               </div>
 
               <button type="button" className="secondary toggle-btn" onClick={() => setEditExpanded(v => !v)}>

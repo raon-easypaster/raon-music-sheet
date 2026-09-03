@@ -3,7 +3,7 @@ import { useState } from 'react'
 const KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
                'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'A#m', 'Bm']
 
-const EMPTY = { title: '', artist: '', key: '', bpm: '', youtubeUrl: '', mrUrl: '', sheetImageUrl: '', sheetPdfUrl: '', structure: '', notes: '' }
+const EMPTY = { title: '', artist: '', key: '', bpm: '', capo: 0, youtubeUrl: '', mrUrl: '', sheetImageUrl: '', sheetPdfUrl: '', structure: '', notes: '' }
 
 export default function SongForm({ onCreate }) {
   const [form, setForm] = useState(EMPTY)
@@ -23,6 +23,7 @@ export default function SongForm({ onCreate }) {
     try {
       const payload = { ...form }
       if (payload.bpm) payload.bpm = Number(payload.bpm)
+      payload.capo = Number(payload.capo) || 0
       await onCreate(payload)
       setForm(EMPTY)
       setExpanded(false)
@@ -85,6 +86,11 @@ export default function SongForm({ onCreate }) {
           min="1"
           max="300"
         />
+
+        <select name="capo" value={form.capo} onChange={handleChange}>
+          <option value={0}>카포 없음</option>
+          {[1,2,3,4,5,6,7].map(n => <option key={n} value={n}>카포 {n}프렛</option>)}
+        </select>
       </div>
 
       <button type="button" className="secondary toggle-btn" onClick={() => setExpanded((v) => !v)}>

@@ -99,6 +99,7 @@ export default function PublicSetlistView() {
                 {(s.key || s.bpm > 0) && (
                   <div style={{ marginTop: 3 }}>
                     {s.key   && <span className="badge badge-key" style={{ fontSize: 10 }}>{s.key}</span>}
+                    {s.capo > 0 && <span className="badge" style={{ fontSize: 10, marginLeft: 3, background: '#fef9c3', color: '#854d0e' }}>카포{s.capo}</span>}
                     {s.bpm > 0 && <span className="badge badge-bpm" style={{ fontSize: 10, marginLeft: 3 }}>{s.bpm}</span>}
                   </div>
                 )}
@@ -261,6 +262,7 @@ function SongContent({ song }) {
         </div>
         <div className="badge-row">
           {song.key    && <span className="badge badge-key">🎵 {song.key}</span>}
+          {song.capo > 0 && <span className="badge" style={{ background: '#fef9c3', color: '#854d0e' }}>카포 {song.capo}프렛</span>}
           {song.bpm > 0 && <span className="badge badge-bpm">♩ {song.bpm} BPM</span>}
         </div>
       </div>

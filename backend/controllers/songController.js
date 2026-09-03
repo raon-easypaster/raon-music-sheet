@@ -1,6 +1,6 @@
 const Song = require('../models/Song')
 
-const SONG_FIELDS = ['title', 'artist', 'key', 'bpm', 'youtubeUrl', 'mrUrl', 'sheetImageUrl', 'sheetPdfUrl', 'notes']
+const SONG_FIELDS = ['title', 'artist', 'key', 'bpm', 'capo', 'youtubeUrl', 'mrUrl', 'sheetImageUrl', 'sheetPdfUrl', 'structure', 'notes']
 
 exports.getSongs = async (req, res) => {
   try {
