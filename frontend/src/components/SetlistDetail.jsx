@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
+import { getPublicCurrentSong, setPublicCurrentSong } from '../api/setlists'
 
 export default function SetlistDetail({
   setlist,
@@ -11,18 +12,23 @@ export default function SetlistDetail({
   const [selectedSongIds, setSelectedSongIds] = useState([])
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [shareLink, setShareLink] = useState(null)
-  const [copied, setCopied] = useState(false)
+  const [shareLink,     setShareLink]     = useState(null)
+  const [shareToken,    setShareToken]    = useState(null)
+  const [conductorIdx,  setConductorIdx]  = useState(0)
+  const [copied,        setCopied]        = useState(false)
   const [summaryCopied, setSummaryCopied] = useState(false)
 
   // drag state
   const dragIndex = useRef(null)
   const [localSongs, setLocalSongs] = useState([])
 
+  // 콘티가 바뀌면 공유 상태 초기화
   useEffect(() => {
     setSelectedSongIds([])
     setError('')
     setShareLink(null)
+    setShareToken(null)
+    setConductorIdx(0)
     if (setlist?.songs) {
       setLocalSongs(setlist.songs.filter(s => typeof s !== 'string'))
     } else {
@@ -102,12 +108,33 @@ export default function SetlistDetail({
   async function handleShare() {
     if (!onShare) return
     try {
-      const { shareToken } = await onShare(setlist._id)
-      const link = `${window.location.origin}/share/${shareToken}`
+      const { shareToken: token } = await onShare(setlist._id)
+      const link = `${window.location.origin}/share/${token}`
       setShareLink(link)
+      setShareToken(token)
     } catch (err) {
       setError(err.message || '링크 생성 실패')
     }
+  }
+
+  // 공유 중일 때 현재 진행 인덱스 폴링 (3초)
+  useEffect(() => {
+    if (!shareToken) return
+    const poll = async () => {
+      try {
+        const { index } = await getPublicCurrentSong(shareToken)
+        setConductorIdx(index)
+      } catch {}
+    }
+    poll()
+    const id = setInterval(poll, 3000)
+    return () => clearInterval(id)
+  }, [shareToken])
+
+  async function conductGo(idx) {
+    if (!shareToken || idx < 0 || idx >= localSongs.length) return
+    setConductorIdx(idx)
+    try { await setPublicCurrentSong(shareToken, idx) } catch {}
   }
 
   function copyLink() {
@@ -157,19 +184,54 @@ export default function SetlistDetail({
       </div>
 
       {shareLink && (
-        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '10px 14px', marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 12, flex: 1, wordBreak: 'break-all', color: '#166534' }}>{shareLink}</span>
-          <button type="button" className="secondary" style={{ fontSize: 12, padding: '4px 10px' }} onClick={copyLink}>
-            {copied ? '복사됨!' : '복사'}
-          </button>
-          <button
-            type="button"
-            style={{ fontSize: 12, padding: '4px 10px', background: '#15803d', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}
-            onClick={() => window.open(shareLink, '_blank')}
-          >
-            📺 진행하기
-          </button>
-        </div>
+        <>
+          {/* 링크 표시줄 */}
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '10px 14px', marginBottom: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, flex: 1, wordBreak: 'break-all', color: '#166534' }}>{shareLink}</span>
+            <button type="button" className="secondary" style={{ fontSize: 12, padding: '4px 10px' }} onClick={copyLink}>
+              {copied ? '복사됨!' : '복사'}
+            </button>
+            <button
+              type="button"
+              style={{ fontSize: 12, padding: '4px 10px', background: '#64748b', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}
+              onClick={() => window.open(shareLink, '_blank')}
+            >
+              🔗 미리보기
+            </button>
+          </div>
+
+          {/* 진행 컨트롤러 */}
+          {localSongs.length > 0 && (
+            <div style={{ background: '#14532d', borderRadius: 12, padding: '12px 16px', marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button
+                onClick={() => conductGo(conductorIdx - 1)}
+                disabled={conductorIdx === 0}
+                style={{ width: 44, height: 44, border: 'none', borderRadius: 8, background: conductorIdx === 0 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.25)', color: '#fff', fontSize: 22, cursor: conductorIdx === 0 ? 'default' : 'pointer', flexShrink: 0 }}
+              >‹</button>
+
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 2 }}>
+                  🔴 실시간 진행 중 · {conductorIdx + 1} / {localSongs.length}곡
+                </div>
+                <div style={{ color: '#fff', fontWeight: 700, fontSize: 15, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                  {localSongs[conductorIdx]?.title || '—'}
+                </div>
+                {localSongs[conductorIdx]?.key && (
+                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 }}>
+                    Key {localSongs[conductorIdx].key}
+                    {localSongs[conductorIdx].bpm > 0 && ` · ${localSongs[conductorIdx].bpm} BPM`}
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={() => conductGo(conductorIdx + 1)}
+                disabled={conductorIdx === localSongs.length - 1}
+                style={{ width: 44, height: 44, border: 'none', borderRadius: 8, background: conductorIdx === localSongs.length - 1 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.25)', color: '#fff', fontSize: 22, cursor: conductorIdx === localSongs.length - 1 ? 'default' : 'pointer', flexShrink: 0 }}
+              >›</button>
+            </div>
+          )}
+        </>
       )}
 
       <div className="section-block">
