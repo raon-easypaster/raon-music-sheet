@@ -37,14 +37,26 @@ export default function SongForm({ onCreate }) {
     <form className="card form-card" onSubmit={handleSubmit}>
       <h2>곡 추가</h2>
 
-      <input
-        type="text"
-        name="title"
-        placeholder="곡 제목 *"
-        value={form.title}
-        onChange={handleChange}
-        required
-      />
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          style={{ flex: 1, marginBottom: 0 }}
+          type="text"
+          name="title"
+          placeholder="곡 제목 *"
+          value={form.title}
+          onChange={handleChange}
+          required
+        />
+        <button
+          type="button"
+          className="secondary"
+          style={{ flexShrink: 0, fontSize: 13, padding: '0 12px' }}
+          disabled={!form.title.trim()}
+          onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(form.title + ' 찬양 악보')}`, '_blank')}
+        >
+          🔍 구글
+        </button>
+      </div>
 
       <input
         type="text"
