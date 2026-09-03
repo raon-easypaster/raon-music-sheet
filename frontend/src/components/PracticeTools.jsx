@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import ScaleChart from './ScaleChart'
 
 const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 const MINOR = ['Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'A#m', 'Bm']
@@ -325,6 +326,9 @@ export default function PracticeTools() {
         <Metronome />
         <Tuner />
         <CapoCalc />
+      </div>
+      <div style={{ marginTop: 20 }}>
+        <ScaleChart />
       </div>
     </div>
   )
