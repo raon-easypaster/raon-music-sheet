@@ -54,7 +54,7 @@ function Step({ n, title, desc }) {
   return (
     <div style={{ display: 'flex', gap: 14, padding: '14px 16px', borderBottom: '1px solid #e2e8f0', alignItems: 'flex-start' }}>
       <div style={{
-        width: 24, height: 24, borderRadius: '50%', background: '#0b3fb8', color: '#fff',
+        width: 24, height: 24, borderRadius: '50%', background: '#15803d', color: '#fff',
         fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0, marginTop: 1
       }}>{n}</div>
@@ -68,7 +68,7 @@ function Step({ n, title, desc }) {
 
 function Tip({ children }) {
   return (
-    <div style={{ padding: '10px 16px', background: '#eff6ff', borderTop: '1px solid #e2e8f0', fontSize: 13, color: '#1e40af' }}>
+    <div style={{ padding: '10px 16px', background: '#f0fdf4', borderTop: '1px solid #e2e8f0', fontSize: 13, color: '#15803d' }}>
       💡 {children}
     </div>
   )
