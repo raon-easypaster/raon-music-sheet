@@ -1,0 +1,514 @@
+<title>RAON music sheet 사용법</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap">
+
+<style>
+  :root {
+    --bg: #f0faf5;
+    --bg-card: #ffffff;
+    --bg-step: #e6f5ed;
+    --text: #0d2a1a;
+    --muted: #3a6b50;
+    --border: #b8e0cb;
+    --accent: #16a34a;
+    --accent-light: #dcfce7;
+    --navy: #14532d;
+    --navy-light: #166534;
+    --green: #22c55e;
+    --green-bg: #dcfce7;
+    --tag-bg: #e6f5ed;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0a1f12;
+      --bg-card: #0f2b1a;
+      --bg-step: #133520;
+      --text: #d4f0e0;
+      --muted: #6db98a;
+      --border: #1e5232;
+      --accent: #22c55e;
+      --accent-light: #0a2e12;
+      --navy: #1a7a40;
+      --navy-light: #22a050;
+      --green: #4ade80;
+      --green-bg: #0a2e12;
+      --tag-bg: #133520;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #0a1f12;
+    --bg-card: #0f2b1a;
+    --bg-step: #133520;
+    --text: #d4f0e0;
+    --muted: #6db98a;
+    --border: #1e5232;
+    --accent: #22c55e;
+    --accent-light: #0a2e12;
+    --navy: #1a7a40;
+    --navy-light: #22a050;
+    --green: #4ade80;
+    --green-bg: #0a2e12;
+    --tag-bg: #133520;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 15px;
+    padding-bottom: 60px;
+  }
+
+  .hero {
+    background: linear-gradient(135deg, #14532d 0%, #166534 50%, #15803d 100%);
+    color: #ffffff;
+    padding: 48px 24px 40px;
+    text-align: center;
+  }
+
+  .hero-badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    padding: 4px 12px;
+    border-radius: 100px;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+  }
+
+  .hero h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: #ffffff;
+    text-wrap: balance;
+  }
+
+  .hero p {
+    font-size: 15px;
+    color: rgba(255,255,255,0.7);
+    max-width: 380px;
+    margin: 0 auto 20px;
+  }
+
+  .hero-url {
+    display: inline-block;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.9);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    word-break: break-all;
+  }
+
+  .content {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+
+  .section {
+    margin-top: 36px;
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .step {
+    display: flex;
+    gap: 16px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+    align-items: flex-start;
+  }
+
+  .step:last-child { border-bottom: none; }
+
+  .step-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--navy);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .step-body { flex: 1; }
+
+  .step-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .step-desc {
+    font-size: 13.5px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .step-desc strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .tip {
+    background: var(--accent-light);
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 13px;
+    color: var(--text);
+    margin-top: 12px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .tip-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+    line-height: 1.4;
+  }
+
+  .notice {
+    background: var(--green-bg);
+    border: 1px solid var(--green);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 13px;
+    color: var(--text);
+    margin-top: 12px;
+    display: flex;
+    gap: 10px;
+  }
+
+  .feature-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 0;
+  }
+
+  .feature-item {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .feature-icon {
+    font-size: 22px;
+    margin-bottom: 8px;
+  }
+
+  .feature-title {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: var(--text);
+  }
+
+  .feature-desc {
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  .url-box {
+    background: var(--bg-step);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--navy-light);
+    font-weight: 600;
+    word-break: break-all;
+    margin-top: 8px;
+  }
+
+  .tag {
+    display: inline-block;
+    background: var(--tag-bg);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 4px;
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 32px 0;
+  }
+
+  .footer {
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  @media (max-width: 480px) {
+    .feature-grid { grid-template-columns: 1fr; }
+    .hero h1 { font-size: 22px; }
+  }
+</style>
+
+<div class="hero">
+  <div class="hero-badge">사용 안내</div>
+  <h1>RAON music sheet</h1>
+  <p>찬양팀 악보 &amp; 콘티 관리 앱 사용 가이드</p>
+  <div class="hero-url">raon-music-sheet.vercel.app</div>
+</div>
+
+<div class="content">
+
+  <!-- 주요 기능 -->
+  <div class="section">
+    <div class="section-label">주요 기능</div>
+    <div class="feature-grid">
+      <div class="feature-item">
+        <div class="feature-icon">🎵</div>
+        <div class="feature-title">악보 관리</div>
+        <div class="feature-desc">찬양곡 악보를 등록하고 조(Key)·빠르기(BPM) 정보 관리</div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">📋</div>
+        <div class="feature-title">콘티 작성</div>
+        <div class="feature-desc">주일 예배 콘티를 만들고 곡 순서를 드래그로 정렬</div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">🔗</div>
+        <div class="feature-title">공개 공유</div>
+        <div class="feature-desc">로그인 없이도 볼 수 있는 공유 링크 생성</div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">👥</div>
+        <div class="feature-title">팀 관리</div>
+        <div class="feature-desc">찬양팀 멤버 정보와 역할 관리</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1. 접속 및 계정 -->
+  <div class="section">
+    <div class="section-label">시작하기</div>
+    <div class="card">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">앱 접속</div>
+          <div class="step-desc">아래 주소로 접속합니다.</div>
+          <div class="url-box">raon-music-sheet.vercel.app</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">회원가입</div>
+          <div class="step-desc">
+            이메일 주소와 비밀번호(6자 이상)를 입력하고 <strong>회원가입</strong> 버튼을 누릅니다.<br>
+            이미 가입했다면 <strong>"이미 계정이 있어요 → 로그인"</strong>을 눌러 로그인합니다.
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">대시보드 입장</div>
+          <div class="step-desc">로그인 후 <strong>곡 목록 · 콘티 · 팀</strong> 세 탭이 보입니다. 탭을 눌러 원하는 메뉴로 이동합니다.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 악보 등록 -->
+  <div class="section">
+    <div class="section-label">악보 등록</div>
+    <div class="card">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">곡 목록 탭 선택</div>
+          <div class="step-desc">상단 탭에서 <strong>곡 목록</strong>을 누릅니다.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">곡 정보 입력</div>
+          <div class="step-desc">
+            <strong>곡 제목</strong> (필수), <strong>아티스트</strong>, <strong>Key</strong> (예: G, Am), <strong>BPM</strong>을 입력합니다.
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">악보 파일 또는 링크 등록</div>
+          <div class="step-desc">PDF 악보를 업로드하거나 YouTube·악보 URL을 붙여넣고 <strong>등록</strong>을 누릅니다.</div>
+        </div>
+      </div>
+    </div>
+    <div class="tip">
+      <span class="tip-icon">🔍</span>
+      <span>곡 제목 입력 후 <strong>구글</strong> 버튼을 누르면 "곡명 찬양 악보"로 구글 검색이 바로 열립니다.</span>
+    </div>
+    <div class="tip">
+      <span class="tip-icon">💡</span>
+      <span>곡 제목을 클릭하면 악보 상세 보기(PDF·동영상)가 열립니다.</span>
+    </div>
+  </div>
+
+  <!-- 3. 콘티 작성 -->
+  <div class="section">
+    <div class="section-label">콘티 작성</div>
+    <div class="card">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">콘티 탭 선택 후 새 콘티 만들기</div>
+          <div class="step-desc">상단 탭에서 <strong>콘티</strong>를 누르고, 콘티 이름을 입력 후 <strong>만들기</strong>를 누릅니다.<br>예: <em>"2026년 9월 첫째주 주일 예배"</em></div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">곡 추가</div>
+          <div class="step-desc">콘티를 선택한 뒤 <strong>곡 추가</strong> 버튼을 누르면 등록된 곡 목록에서 선택할 수 있습니다.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">순서 변경</div>
+          <div class="step-desc">곡 옆의 <strong>⠿ 핸들</strong>을 잡고 드래그하면 곡 순서를 바꿀 수 있습니다. 변경된 순서는 자동 저장됩니다.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. 공유 링크 -->
+  <div class="section">
+    <div class="section-label">콘티 공유</div>
+    <div class="card">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">공유 링크 생성</div>
+          <div class="step-desc">콘티 상세 화면에서 <strong>공유 링크 생성</strong> 버튼을 누릅니다.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">링크 복사 후 전달</div>
+          <div class="step-desc">생성된 링크를 복사해서 카카오톡·문자 등으로 팀원에게 전달합니다.</div>
+        </div>
+      </div>
+    </div>
+    <div class="notice">
+      <span>✅</span>
+      <span>공유 링크를 받은 사람은 <strong>로그인 없이</strong> 콘티와 악보를 볼 수 있습니다.</span>
+    </div>
+  </div>
+
+  <!-- 5. 팀 관리 -->
+  <div class="section">
+    <div class="section-label">팀 관리</div>
+    <div class="card">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">팀 탭 선택</div>
+          <div class="step-desc">상단 탭에서 <strong>팀</strong>을 누릅니다.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">멤버 추가</div>
+          <div class="step-desc">이름과 역할(보컬, 기타, 드럼 등)을 입력해 팀원을 추가합니다.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. 비밀번호 변경 -->
+  <div class="section">
+    <div class="section-label">비밀번호 변경</div>
+    <div class="card">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">상단 "비밀번호 변경" 버튼 클릭</div>
+          <div class="step-desc">로그인 후 화면 오른쪽 상단 <strong>비밀번호 변경</strong> 버튼을 누릅니다.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">현재·새 비밀번호 입력 후 변경</div>
+          <div class="step-desc">현재 비밀번호를 확인한 뒤 새 비밀번호(6자 이상)를 두 번 입력하고 <strong>변경</strong>을 누릅니다.</div>
+        </div>
+      </div>
+    </div>
+    <div class="tip">
+      <span class="tip-icon">🔑</span>
+      <span>비밀번호를 분실한 경우 관리자에게 문의하면 계정을 초기화해드립니다.</span>
+    </div>
+  </div>
+
+  <div class="footer">
+    RAON music sheet · 라온동행교회 찬양팀<br>
+    문의: 관리자에게 연락해주세요
+  </div>
+
+</div>
