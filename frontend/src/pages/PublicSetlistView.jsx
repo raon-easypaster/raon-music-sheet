@@ -212,7 +212,13 @@ export default function PublicSetlistView() {
         {/* 메인 콘텐츠 */}
         <main style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
           {song
-            ? <SongContent song={song} />
+            ? <SongContent
+                song={song}
+                currentIdx={currentIdx}
+                totalSongs={songs.length}
+                onPrev={() => handleSelectSong(currentIdx - 1)}
+                onNext={() => handleSelectSong(currentIdx + 1)}
+              />
             : <div className="card panel"><p className="muted">곡이 없습니다</p></div>
           }
         </main>
@@ -343,10 +349,11 @@ function MobileSongSlider({ songs, currentIdx, onSelect }) {
   )
 }
 
-/* ── 악보 콘텐츠 (줌 컨트롤 포함) ──────────────────────────── */
-function SongContent({ song }) {
+/* ── 악보 콘텐츠 (줌 컨트롤 + 곡 내비게이션 포함) ──────────────────────────── */
+function SongContent({ song, currentIdx = 0, totalSongs = 1, onPrev, onNext }) {
   const [scale, setScale]     = useState(1)
   const [fitted, setFitted]   = useState(true)   // true = 세로 맞춤(전체 보기), false = 가로 스케일
+  const touchStartX = useRef(null)
   const youtubeId = getYoutubeEmbedId(song.youtubeUrl)
 
   // 곡이 바뀌면 맞춤 모드로 초기화
@@ -355,6 +362,17 @@ function SongContent({ song }) {
   function handleFit()  { setFitted(true);  setScale(1) }
   function handleMinus(){ setFitted(false); setScale(s => Math.max(0.4, +(s - 0.2).toFixed(1))) }
   function handlePlus() { setFitted(false); setScale(s => Math.min(3,   +(s + 0.2).toFixed(1))) }
+
+  function onTouchStart(e) { touchStartX.current = e.touches[0].clientX }
+  function onTouchEnd(e) {
+    if (touchStartX.current === null) return
+    const delta = e.changedTouches[0].clientX - touchStartX.current
+    if (Math.abs(delta) > 50) {
+      if (delta < 0 && onNext) onNext()
+      else if (delta > 0 && onPrev) onPrev()
+    }
+    touchStartX.current = null
+  }
 
   return (
     <div className="card panel">
@@ -408,12 +426,60 @@ function SongContent({ song }) {
 
           {fitted ? (
             /* 세로 맞춤: 컨테이너 높이에 이미지 전체가 들어오도록 */
-            <div style={{ height: 'calc(100dvh - 260px)', minHeight: 200, overflow: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', justifyContent: 'center' }}>
+            <div
+              style={{ position: 'relative', height: 'calc(100dvh - 260px)', minHeight: 200, overflow: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', justifyContent: 'center' }}
+              onTouchStart={onTouchStart}
+              onTouchEnd={onTouchEnd}
+            >
               <img
                 src={song.sheetImageUrl}
                 alt="악보"
                 style={{ height: '100%', width: 'auto', maxWidth: 'none', display: 'block', objectFit: 'contain' }}
+                draggable={false}
               />
+              {/* 이전 곡 오버레이 */}
+              {onPrev && currentIdx > 0 && (
+                <button
+                  onClick={onPrev}
+                  style={{
+                    position: 'absolute', left: 0, top: 0, height: '100%', width: 52,
+                    background: 'linear-gradient(to right, rgba(0,0,0,0.18), transparent)',
+                    border: 'none', cursor: 'pointer', fontSize: 30,
+                    color: 'rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    opacity: 0, transition: 'opacity 0.2s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                  onMouseLeave={e => e.currentTarget.style.opacity = 0}
+                  title="이전 곡"
+                >‹</button>
+              )}
+              {/* 다음 곡 오버레이 */}
+              {onNext && currentIdx < totalSongs - 1 && (
+                <button
+                  onClick={onNext}
+                  style={{
+                    position: 'absolute', right: 0, top: 0, height: '100%', width: 52,
+                    background: 'linear-gradient(to left, rgba(0,0,0,0.18), transparent)',
+                    border: 'none', cursor: 'pointer', fontSize: 30,
+                    color: 'rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    opacity: 0, transition: 'opacity 0.2s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                  onMouseLeave={e => e.currentTarget.style.opacity = 0}
+                  title="다음 곡"
+                >›</button>
+              )}
+              {/* 곡 위치 표시 */}
+              {totalSongs > 1 && (
+                <div style={{
+                  position: 'absolute', bottom: 8, right: 8,
+                  background: 'rgba(0,0,0,0.45)', color: '#fff',
+                  fontSize: 11, padding: '3px 8px', borderRadius: 10,
+                  pointerEvents: 'none',
+                }}>
+                  {currentIdx + 1} / {totalSongs}
+                </div>
+              )}
             </div>
           ) : (
             /* 가로 스케일 모드 */
