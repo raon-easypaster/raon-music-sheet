@@ -17,6 +17,8 @@ export default function PublicSetlistView() {
   const [currentIdx, setCurrentIdx] = useState(0)
   const [error,      setError]      = useState('')
   const [loading,    setLoading]    = useState(true)
+  const [sheetOnly,  setSheetOnly]  = useState(false)
+  const touchStartX = useRef(null)
 
   useEffect(() => {
     getPublicSetlist(token)
@@ -40,8 +42,23 @@ export default function PublicSetlistView() {
   }, [token, setlist])
 
   async function handleSelectSong(idx) {
+    if (idx < 0 || idx >= (setlist?.songs?.length ?? 0)) return
     setCurrentIdx(idx)
     try { await setPublicCurrentSong(token, idx) } catch {}
+  }
+
+  function handleTouchStart(e) {
+    touchStartX.current = e.touches[0].clientX
+  }
+
+  function handleTouchEnd(e) {
+    if (touchStartX.current === null) return
+    const delta = e.changedTouches[0].clientX - touchStartX.current
+    if (Math.abs(delta) > 50) {
+      if (delta < 0) handleSelectSong(currentIdx + 1)
+      else handleSelectSong(currentIdx - 1)
+    }
+    touchStartX.current = null
   }
 
   if (loading) return (
@@ -69,11 +86,95 @@ export default function PublicSetlistView() {
           <h1>RAON music sheet</h1>
           <p className="muted">{setlist.name}</p>
         </div>
-        <span style={{ fontSize: 12, color: '#94a3b8' }}>🔴 실시간 동기화 중</span>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button
+            onClick={() => setSheetOnly(v => !v)}
+            style={{
+              fontSize: 12, padding: '5px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600,
+              background: sheetOnly ? '#15803d' : '#e2e8f0',
+              color: sheetOnly ? '#fff' : '#374151',
+            }}
+          >
+            {sheetOnly ? '📋 전체 보기' : '📄 악보만'}
+          </button>
+          <span style={{ fontSize: 12, color: '#94a3b8' }}>🔴 실시간 동기화 중</span>
+        </div>
       </header>
 
+      {/* 악보만 슬라이드 모드 */}
+      {sheetOnly && (
+        <div
+          style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#111', position: 'relative', overflow: 'hidden' }}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* 상단 곡 정보 */}
+          <div style={{ position: 'absolute', top: 12, left: 0, right: 0, textAlign: 'center', zIndex: 10, pointerEvents: 'none' }}>
+            <span style={{ background: 'rgba(0,0,0,0.55)', color: '#fff', padding: '5px 14px', borderRadius: 20, fontSize: 13, backdropFilter: 'blur(4px)' }}>
+              {currentIdx + 1}/{songs.length} · {song?.title}
+              {song?.key && <span style={{ marginLeft: 8, opacity: 0.7 }}>Key {song.key}{song?.capo > 0 ? ` · 카포${song.capo}` : ''}</span>}
+            </span>
+          </div>
+
+          {/* 악보 이미지 */}
+          {song?.sheetImageUrl ? (
+            <img
+              src={song.sheetImageUrl}
+              alt="악보"
+              style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', userSelect: 'none' }}
+              draggable={false}
+            />
+          ) : (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#475569', gap: 8 }}>
+              <div style={{ fontSize: 40 }}>🎵</div>
+              <div style={{ fontSize: 15, fontWeight: 600 }}>{song?.title}</div>
+              <div style={{ fontSize: 13 }}>악보 이미지 없음</div>
+            </div>
+          )}
+
+          {/* 이전/다음 터치 영역 */}
+          <button
+            onClick={() => handleSelectSong(currentIdx - 1)}
+            disabled={currentIdx === 0}
+            style={{
+              position: 'absolute', left: 0, top: 0, width: 64, height: '100%',
+              background: 'transparent', border: 'none', cursor: currentIdx === 0 ? 'default' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 36, color: currentIdx === 0 ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.4)',
+            }}
+          >‹</button>
+          <button
+            onClick={() => handleSelectSong(currentIdx + 1)}
+            disabled={currentIdx === songs.length - 1}
+            style={{
+              position: 'absolute', right: 0, top: 0, width: 64, height: '100%',
+              background: 'transparent', border: 'none', cursor: currentIdx === songs.length - 1 ? 'default' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 36, color: currentIdx === songs.length - 1 ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.4)',
+            }}
+          >›</button>
+
+          {/* 하단 곡 인디케이터 점 */}
+          {songs.length <= 12 && (
+            <div style={{ position: 'absolute', bottom: 16, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 6 }}>
+              {songs.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleSelectSong(i)}
+                  style={{
+                    width: 8, height: 8, borderRadius: '50%', border: 'none', padding: 0, cursor: 'pointer',
+                    background: i === currentIdx ? '#fff' : 'rgba(255,255,255,0.3)',
+                    transition: 'background 0.2s',
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 데스크톱: 2컬럼 / 모바일: 스택 */}
-      <div className="share-layout" style={{ flex: 1, minHeight: 0 }}>
+      {!sheetOnly && <div className="share-layout" style={{ flex: 1, minHeight: 0 }}>
         {/* 사이드 곡 목록 (데스크톱에서만 보임) */}
         <aside className="share-sidebar">
           <div style={{ padding: '12px 14px', borderBottom: '1px solid #e2e8f0', fontSize: 13, fontWeight: 700 }}>
@@ -115,14 +216,16 @@ export default function PublicSetlistView() {
             : <div className="card panel"><p className="muted">곡이 없습니다</p></div>
           }
         </main>
-      </div>
+      </div>}
 
-      {/* 모바일 하단 슬라이더 */}
-      <MobileSongSlider
-        songs={songs}
-        currentIdx={currentIdx}
-        onSelect={handleSelectSong}
-      />
+      {/* 모바일 하단 슬라이더 (전체 보기 모드에서만) */}
+      {!sheetOnly && (
+        <MobileSongSlider
+          songs={songs}
+          currentIdx={currentIdx}
+          onSelect={handleSelectSong}
+        />
+      )}
 
       <style>{`
         .share-layout {
