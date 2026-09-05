@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { getPublicSetlist, getPublicCurrentSong, setPublicCurrentSong } from '../api/setlists'
 
 function getYoutubeEmbedId(url) {
@@ -13,11 +13,12 @@ function getYoutubeEmbedId(url) {
 
 export default function PublicSetlistView() {
   const { token } = useParams()
+  const [searchParams] = useSearchParams()
   const [setlist,    setSetlist]    = useState(null)
   const [currentIdx, setCurrentIdx] = useState(0)
   const [error,      setError]      = useState('')
   const [loading,    setLoading]    = useState(true)
-  const [sheetOnly,  setSheetOnly]  = useState(false)
+  const [sheetOnly,  setSheetOnly]  = useState(searchParams.get('view') === 'sheet')
   const touchStartX = useRef(null)
 
   useEffect(() => {
@@ -104,7 +105,7 @@ export default function PublicSetlistView() {
       {/* 악보만 슬라이드 모드 */}
       {sheetOnly && (
         <div
-          style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#111', position: 'relative', overflow: 'hidden' }}
+          style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#111', position: 'relative' }}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
@@ -118,12 +119,14 @@ export default function PublicSetlistView() {
 
           {/* 악보 이미지 */}
           {song?.sheetImageUrl ? (
-            <img
-              src={song.sheetImageUrl}
-              alt="악보"
-              style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', userSelect: 'none' }}
-              draggable={false}
-            />
+            <div style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden', display: 'flex', justifyContent: 'center', WebkitOverflowScrolling: 'touch' }}>
+              <img
+                src={song.sheetImageUrl}
+                alt="악보"
+                style={{ height: '100%', width: 'auto', maxWidth: 'none', display: 'block', userSelect: 'none' }}
+                draggable={false}
+              />
+            </div>
           ) : (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#475569', gap: 8 }}>
               <div style={{ fontSize: 40 }}>🎵</div>

@@ -280,6 +280,14 @@ export default function SetlistDetail({
             >
               🔗 미리보기
             </button>
+            <button
+              type="button"
+              style={{ fontSize: 12, padding: '4px 10px', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}
+              onClick={() => { navigator.clipboard.writeText(`${shareLink}?view=sheet`) }}
+              title="악보 슬라이드 모드로 바로 열리는 링크 복사"
+            >
+              📄 악보링크
+            </button>
           </div>
 
           {/* 진행 컨트롤러 */}
