@@ -18,7 +18,8 @@ export default function PublicSetlistView() {
   const [currentIdx, setCurrentIdx] = useState(0)
   const [error,      setError]      = useState('')
   const [loading,    setLoading]    = useState(true)
-  const [sheetOnly,  setSheetOnly]  = useState(searchParams.get('view') === 'sheet')
+  const [sheetOnly,     setSheetOnly]     = useState(searchParams.get('view') === 'sheet')
+  const [showPageGrid,  setShowPageGrid]  = useState(false)
   const touchStartX = useRef(null)
 
   useEffect(() => {
@@ -45,6 +46,7 @@ export default function PublicSetlistView() {
   async function handleSelectSong(idx) {
     if (idx < 0 || idx >= (setlist?.songs?.length ?? 0)) return
     setCurrentIdx(idx)
+    setShowPageGrid(false)
     try { await setPublicCurrentSong(token, idx) } catch {}
   }
 
@@ -109,21 +111,69 @@ export default function PublicSetlistView() {
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
-          {/* 상단 곡 정보 */}
-          <div style={{ position: 'absolute', top: 12, left: 0, right: 0, textAlign: 'center', zIndex: 10, pointerEvents: 'none' }}>
-            <span style={{ background: 'rgba(0,0,0,0.55)', color: '#fff', padding: '5px 14px', borderRadius: 20, fontSize: 13, backdropFilter: 'blur(4px)' }}>
+          {/* 상단 바: 곡 정보 + 페이지 그리드 버튼 */}
+          <div style={{ position: 'absolute', top: 10, left: 0, right: 0, zIndex: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, pointerEvents: 'none' }}>
+            <span style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '5px 14px', borderRadius: 20, fontSize: 13, backdropFilter: 'blur(4px)', pointerEvents: 'none' }}>
               {currentIdx + 1}/{songs.length} · {song?.title}
               {song?.key && <span style={{ marginLeft: 8, opacity: 0.7 }}>Key {song.key}{song?.capo > 0 ? ` · 카포${song.capo}` : ''}</span>}
             </span>
+            <button
+              onClick={() => setShowPageGrid(v => !v)}
+              style={{
+                pointerEvents: 'auto', background: showPageGrid ? '#15803d' : 'rgba(0,0,0,0.6)',
+                color: '#fff', border: 'none', borderRadius: 20, padding: '5px 12px',
+                fontSize: 13, cursor: 'pointer', backdropFilter: 'blur(4px)', fontWeight: 600,
+              }}
+            >⊞ 목록</button>
           </div>
 
-          {/* 악보 이미지 */}
+          {/* 페이지 그리드 오버레이 */}
+          {showPageGrid && (
+            <div style={{ position: 'absolute', inset: 0, zIndex: 15, background: 'rgba(0,0,0,0.92)', overflowY: 'auto', padding: '56px 16px 16px', WebkitOverflowScrolling: 'touch' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                {songs.map((s, i) => (
+                  <div
+                    key={s._id}
+                    onClick={() => { handleSelectSong(i); setShowPageGrid(false) }}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {s.sheetImageUrl ? (
+                      <img
+                        src={s.sheetImageUrl}
+                        alt={s.title}
+                        style={{
+                          width: '100%', aspectRatio: '3/4', objectFit: 'cover',
+                          borderRadius: 6, display: 'block',
+                          border: i === currentIdx ? '2px solid #15803d' : '2px solid rgba(255,255,255,0.1)',
+                        }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: '100%', aspectRatio: '3/4', background: '#1e293b',
+                        borderRadius: 6, display: 'flex', flexDirection: 'column',
+                        alignItems: 'center', justifyContent: 'center', gap: 4,
+                        border: i === currentIdx ? '2px solid #15803d' : '2px solid rgba(255,255,255,0.1)',
+                      }}>
+                        <span style={{ fontSize: 24 }}>🎵</span>
+                        <span style={{ color: '#64748b', fontSize: 10 }}>악보 없음</span>
+                      </div>
+                    )}
+                    <div style={{ color: i === currentIdx ? '#4ade80' : '#94a3b8', fontSize: 11, marginTop: 5, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '0 2px' }}>
+                      <span style={{ opacity: 0.5, marginRight: 3 }}>{i + 1}</span>{s.title}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 악보 이미지 — 잘리지 않게 width:100%, height:auto, 세로 스크롤 */}
           {song?.sheetImageUrl ? (
-            <div style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden', display: 'flex', justifyContent: 'center', WebkitOverflowScrolling: 'touch' }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' }}>
               <img
                 src={song.sheetImageUrl}
                 alt="악보"
-                style={{ height: '100%', width: 'auto', maxWidth: 'none', display: 'block', userSelect: 'none' }}
+                style={{ width: '100%', height: 'auto', display: 'block', userSelect: 'none' }}
                 draggable={false}
               />
             </div>
@@ -140,34 +190,34 @@ export default function PublicSetlistView() {
             onClick={() => handleSelectSong(currentIdx - 1)}
             disabled={currentIdx === 0}
             style={{
-              position: 'absolute', left: 0, top: 0, width: 64, height: '100%',
+              position: 'absolute', left: 0, top: 0, width: 52, height: '100%',
               background: 'transparent', border: 'none', cursor: currentIdx === 0 ? 'default' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 36, color: currentIdx === 0 ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.4)',
+              fontSize: 36, color: currentIdx === 0 ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)',
+              zIndex: 5,
             }}
           >‹</button>
           <button
             onClick={() => handleSelectSong(currentIdx + 1)}
             disabled={currentIdx === songs.length - 1}
             style={{
-              position: 'absolute', right: 0, top: 0, width: 64, height: '100%',
+              position: 'absolute', right: 0, top: 0, width: 52, height: '100%',
               background: 'transparent', border: 'none', cursor: currentIdx === songs.length - 1 ? 'default' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 36, color: currentIdx === songs.length - 1 ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.4)',
+              fontSize: 36, color: currentIdx === songs.length - 1 ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)',
+              zIndex: 5,
             }}
           >›</button>
 
-          {/* 하단 곡 인디케이터 점 */}
+          {/* 하단 점 인디케이터 */}
           {songs.length <= 12 && (
-            <div style={{ position: 'absolute', bottom: 16, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 6 }}>
+            <div style={{ position: 'absolute', bottom: 14, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 6, zIndex: 5, pointerEvents: 'none' }}>
               {songs.map((_, i) => (
-                <button
+                <div
                   key={i}
-                  onClick={() => handleSelectSong(i)}
                   style={{
-                    width: 8, height: 8, borderRadius: '50%', border: 'none', padding: 0, cursor: 'pointer',
+                    width: i === currentIdx ? 18 : 7, height: 7, borderRadius: 4, transition: 'width 0.2s, background 0.2s',
                     background: i === currentIdx ? '#fff' : 'rgba(255,255,255,0.3)',
-                    transition: 'background 0.2s',
                   }}
                 />
               ))}
