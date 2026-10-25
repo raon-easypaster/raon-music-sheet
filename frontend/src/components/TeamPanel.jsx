@@ -1,18 +1,20 @@
 import { useEffect, useState } from 'react'
-import { getMyTeams, createTeam, joinTeam, leaveTeam, deleteTeam } from '../api/teams'
+import { getMyTeams, createTeam, joinTeam, leaveTeam, deleteTeam, moveMyItemsToTeam } from '../api/teams'
 
-export default function TeamPanel() {
+export default function TeamPanel({ currentUserId, onTeamsChanged, onItemsMoved }) {
   const [teams, setTeams] = useState([])
   const [newTeamName, setNewTeamName] = useState('')
   const [inviteCode, setInviteCode] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [copied, setCopied] = useState(null)
+  const [notice, setNotice] = useState('')
 
   async function load() {
     try {
       const data = await getMyTeams()
       setTeams(Array.isArray(data) ? data : [])
+      onTeamsChanged?.()
     } catch (err) {
       setError(err.message)
     }
@@ -65,12 +67,29 @@ export default function TeamPanel() {
     }
   }
 
-  async function handleDelete(id) {
+  async function handleDelete(team) {
+    if (!window.confirm(`'${team.name}' 팀을 삭제할까요?\n팀 곡·콘티는 지워지지 않고, 각자 만든 사람의 개인 공간으로 돌아갑니다.`)) return
     setSubmitting(true)
     setError('')
     try {
-      await deleteTeam(id)
+      await deleteTeam(team._id)
       await load()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleMoveItems(team) {
+    if (!window.confirm(`내 개인 공간의 곡·콘티를 모두 '${team.name}' 팀으로 옮길까요?\n옮기면 팀원 모두가 보고 편집할 수 있습니다.`)) return
+    setSubmitting(true)
+    setError('')
+    setNotice('')
+    try {
+      const res = await moveMyItemsToTeam(team._id)
+      setNotice(res.message)
+      onItemsMoved?.(team._id)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -89,7 +108,13 @@ export default function TeamPanel() {
     <div className="card panel">
       <h2>팀 관리</h2>
 
+      <p className="muted" style={{ marginTop: 0 }}>
+        팀을 만들거나 초대 코드로 참여한 뒤, 화면 위 <strong>작업 공간</strong>에서 팀을 고르면
+        팀원 모두가 같은 곡·콘티를 보고 편집할 수 있습니다.
+      </p>
+
       {error && <p className="error-text">{error}</p>}
+      {notice && <p style={{ color: 'green' }}>{notice}</p>}
 
       <div className="team-forms">
         <form onSubmit={handleCreate} className="inline-form">
@@ -138,17 +163,25 @@ export default function TeamPanel() {
                 </button>
                 <button
                   className="secondary"
-                  onClick={() => handleLeave(team._id)}
+                  onClick={() => handleMoveItems(team)}
                   disabled={submitting}
                 >
-                  나가기
+                  내 곡·콘티를 이 팀으로 옮기기
                 </button>
-                {team.owner?._id === undefined && (
+                {team.owner?._id === currentUserId ? (
                   <button
-                    onClick={() => handleDelete(team._id)}
+                    onClick={() => handleDelete(team)}
                     disabled={submitting}
                   >
-                    삭제
+                    팀 삭제
+                  </button>
+                ) : (
+                  <button
+                    className="secondary"
+                    onClick={() => handleLeave(team._id)}
+                    disabled={submitting}
+                  >
+                    나가기
                   </button>
                 )}
               </div>

@@ -26,7 +26,7 @@ function sortSongs(songs, by) {
   })
 }
 
-export default function SongList({ songs, onDelete, onUpdate }) {
+export default function SongList({ songs, showOwner, onDelete, onUpdate }) {
   const [viewing,      setViewing]      = useState(null)
   const [editing,      setEditing]      = useState(null)
   const [editForm,     setEditForm]     = useState({})
@@ -122,6 +122,9 @@ export default function SongList({ songs, onDelete, onUpdate }) {
             <div className="song-info">
               <strong>{song.title}</strong>
               <span className="muted">{song.artist}</span>
+              {showOwner && song.user?.email && (
+                <span className="muted" style={{ fontSize: 12 }}>등록: {song.user.email}</span>
+              )}
               <div className="badge-row">
                 {song.key           && <span className="badge badge-key">{song.key}</span>}
                 {song.capo > 0      && <span className="badge" style={{ background: '#fef9c3', color: '#854d0e' }}>카포 {song.capo}</span>}

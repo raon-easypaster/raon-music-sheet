@@ -18,6 +18,10 @@ export function joinTeam(inviteCode) {
   })
 }
 
+export function moveMyItemsToTeam(id) {
+  return apiFetch(`/teams/${id}/move-my-items`, { method: 'POST' })
+}
+
 export function leaveTeam(id) {
   return apiFetch(`/teams/${id}/leave`, { method: 'DELETE' })
 }

@@ -11,6 +11,7 @@ import {
   generateShareToken,
 } from '../api/setlists'
 import { changePasswordRequest } from '../api/auth'
+import { getMyTeams } from '../api/teams'
 import SongForm from '../components/SongForm'
 import SetlistForm from '../components/SetlistForm'
 import SongList from '../components/SongList'
@@ -21,9 +22,18 @@ import HelpPage from '../components/HelpPage'
 import PracticeTools from '../components/PracticeTools'
 
 const TABS = ['곡 목록', '콘티', '팀', '연습 도구', '사용법']
+const WORKSPACE_KEY = 'workspace'
+
+function loadSavedWorkspace() {
+  try { return localStorage.getItem(WORKSPACE_KEY) || '' } catch { return '' }
+}
 
 export default function Dashboard() {
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
+
+  // 작업 공간: '' = 내 개인 공간, 그 외 = 팀 id
+  const [teams, setTeams] = useState([])
+  const [workspace, setWorkspace] = useState(loadSavedWorkspace)
 
   const [songs, setSongs] = useState([])
   const [setlists, setSetlists] = useState([])
@@ -36,11 +46,30 @@ export default function Dashboard() {
   const [pwMsg, setPwMsg] = useState('')
   const [pwLoading, setPwLoading] = useState(false)
 
+  const loadTeams = useCallback(async () => {
+    try {
+      const data = await getMyTeams()
+      const list = Array.isArray(data) ? data : []
+      setTeams(list)
+      // 나간 팀·삭제된 팀이 선택돼 있으면 개인 공간으로
+      setWorkspace((ws) => (ws && !list.some((t) => t._id === ws) ? '' : ws))
+    } catch {
+      setTeams([])
+    }
+  }, [])
+
+  useEffect(() => { loadTeams() }, [loadTeams])
+
+  useEffect(() => {
+    try { localStorage.setItem(WORKSPACE_KEY, workspace) } catch { /* 저장 실패해도 동작에는 지장 없음 */ }
+  }, [workspace])
+
   const loadData = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const [songsData, setlistsData] = await Promise.all([getSongs(), getSetlists()])
+      const team = workspace || undefined
+      const [songsData, setlistsData] = await Promise.all([getSongs(team), getSetlists(team)])
       const songsArray = Array.isArray(songsData) ? songsData : songsData.songs || []
       const setlistsArray = Array.isArray(setlistsData) ? setlistsData : setlistsData.setlists || []
 
@@ -58,16 +87,20 @@ export default function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }, [selectedSetlistId])
+  }, [selectedSetlistId, workspace])
 
   useEffect(() => { loadData() }, [loadData])
 
-  async function handleCreateSong(payload) { await createSong(payload); await loadData() }
-  async function handleCreateSetlist(payload) { await createSetlist(payload); await loadData() }
+  async function handleCreateSong(payload) { await createSong({ ...payload, team: workspace || null }); await loadData() }
+  async function handleCreateSetlist(payload) { await createSetlist({ ...payload, team: workspace || null }); await loadData() }
   async function handleAddSongs(setlistId, songIds) { await addSongsToSetlist(setlistId, songIds); await loadData() }
   async function handleRemoveSong(setlistId, songId) { await removeSongFromSetlist(setlistId, songId); await loadData() }
-  async function handleDeleteSetlist(setlistId) { await deleteSetlist(setlistId); await loadData() }
-  async function handleDeleteSong(songId) { await deleteSong(songId); await loadData() }
+  async function handleDeleteSetlist(setlistId) {
+    try { await deleteSetlist(setlistId); await loadData() } catch (err) { setError(err.message) }
+  }
+  async function handleDeleteSong(songId) {
+    try { await deleteSong(songId); await loadData() } catch (err) { setError(err.message) }
+  }
   async function handleUpdateSong(id, payload) { await updateSong(id, payload); await loadData() }
   async function handleReorder(setlistId, songIds) { await reorderSetlist(setlistId, songIds); await loadData() }
   async function handleShare(setlistId) { return generateShareToken(setlistId) }
@@ -96,6 +129,7 @@ export default function Dashboard() {
   }
 
   const selectedSetlist = setlists.find((s) => s._id === selectedSetlistId) || null
+  const currentTeam = teams.find((t) => t._id === workspace) || null
 
   return (
     <div className="dashboard">
@@ -146,6 +180,25 @@ export default function Dashboard() {
         </div>
       )}
 
+      <div className="card workspace-bar">
+        <label htmlFor="workspace-select">작업 공간</label>
+        <select
+          id="workspace-select"
+          value={workspace}
+          onChange={(e) => { setWorkspace(e.target.value); setSelectedSetlistId(null) }}
+        >
+          <option value="">내 개인 공간</option>
+          {teams.map((t) => (
+            <option key={t._id} value={t._id}>팀: {t.name}</option>
+          ))}
+        </select>
+        <span className="muted">
+          {currentTeam
+            ? `팀원 ${currentTeam.members?.length || 0}명이 이 곡·콘티를 함께 보고 편집합니다`
+            : '나만 보는 곡·콘티입니다'}
+        </span>
+      </div>
+
       {error ? <div className="card error-banner">{error}</div> : null}
 
       <nav className="tab-nav">
@@ -167,7 +220,7 @@ export default function Dashboard() {
           {tab === 0 && (
             <>
               <SongForm onCreate={handleCreateSong} />
-              <SongList songs={songs} onDelete={handleDeleteSong} onUpdate={handleUpdateSong} />
+              <SongList songs={songs} showOwner={!!currentTeam} onDelete={handleDeleteSong} onUpdate={handleUpdateSong} />
             </>
           )}
 
@@ -193,7 +246,13 @@ export default function Dashboard() {
             </>
           )}
 
-          {tab === 2 && <TeamPanel />}
+          {tab === 2 && (
+            <TeamPanel
+              currentUserId={user?._id}
+              onTeamsChanged={loadTeams}
+              onItemsMoved={(teamId) => { setWorkspace(teamId); setSelectedSetlistId(null) }}
+            />
+          )}
           {tab === 3 && <PracticeTools />}
           {tab === 4 && <HelpPage />}
         </>

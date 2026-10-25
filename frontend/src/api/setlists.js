@@ -1,7 +1,7 @@
 import { apiFetch } from './client'
 
-export function getSetlists() {
-  return apiFetch('/setlists')
+export function getSetlists(team) {
+  return apiFetch(team ? `/setlists?team=${team}` : '/setlists')
 }
 
 export function createSetlist(payload) {

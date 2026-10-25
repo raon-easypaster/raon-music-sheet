@@ -1,16 +1,49 @@
 const mongoose = require('mongoose')
 const crypto = require('crypto')
 const Setlist = require('../models/Setlist')
+const Song = require('../models/Song')
+const { resolveWorkspace, accessFilter, canDelete, FORBIDDEN_WORKSPACE } = require('../utils/access')
 
 // In-memory current song index per share token (resets on server restart)
 const currentSongMap = new Map()
 
+function cleanSetlistId(raw) {
+  const cleanId = String(raw).trim().replace(/^"|"$/g, '')
+  return mongoose.Types.ObjectId.isValid(cleanId) ? cleanId : null
+}
+
+// 내가 접근할 수 있는 콘티 (개인 콘티 또는 내가 속한 팀의 콘티)
+async function findAccessibleSetlist(req) {
+  const id = cleanSetlistId(req.params.id)
+  if (!id) return null
+  return Setlist.findOne({ _id: id, ...(await accessFilter(req.user)) })
+}
+
+// 콘티와 같은 작업 공간의 곡만 담을 수 있다
+async function sameWorkspaceSongIds(setlist, songIds) {
+  const scope = setlist.team ? { team: setlist.team } : { user: setlist.user, team: null }
+  const validIds = songIds.filter((id) => mongoose.Types.ObjectId.isValid(String(id)))
+  const songs = await Song.find({ _id: { $in: validIds }, ...scope }, '_id')
+  const allowed = new Set(songs.map((s) => s._id.toString()))
+  return validIds.filter((id) => allowed.has(String(id)))
+}
+
+const populateSetlist = (id) => Setlist.findById(id).populate('songs').populate('user', 'email')
+
 // CREATE SETLIST
 exports.createSetlist = async (req, res) => {
   try {
+    const ws = await resolveWorkspace(req.user, req.body.team)
+    if (!ws) return res.status(403).json({ message: FORBIDDEN_WORKSPACE })
+
+    const { name, venue, gigDate, notes } = req.body
     const setlist = await Setlist.create({
-      ...req.body,
+      name,
+      venue,
+      gigDate,
+      notes,
       user: req.user._id,
+      team: ws.team ? ws.team._id : null,
     })
     res.status(201).json(setlist)
   } catch (err) {
@@ -18,12 +51,17 @@ exports.createSetlist = async (req, res) => {
   }
 }
 
-// GET USER SETLISTS
+// GET SETLISTS — /setlists?team=<팀 id> (team이 없으면 내 개인 콘티)
 exports.getSetlists = async (req, res) => {
   try {
+    const ws = await resolveWorkspace(req.user, req.query.team)
+    if (!ws) return res.status(403).json({ message: FORBIDDEN_WORKSPACE })
+
     const setlists = await Setlist
-      .find({ user: req.user._id })
+      .find(ws.filter)
       .populate('songs')
+      .populate('user', 'email')
+      .sort({ createdAt: -1 })
 
     res.json(setlists)
   } catch (err) {
@@ -34,17 +72,11 @@ exports.getSetlists = async (req, res) => {
 // UPDATE SETLIST DETAILS
 exports.updateSetlist = async (req, res) => {
   try {
-    const cleanId = String(req.params.id).trim().replace(/^"|"$/g, '')
-
-    if (!mongoose.Types.ObjectId.isValid(cleanId)) {
-      return res.status(400).json({ message: `Invalid setlist id: ${cleanId}` })
+    if (!cleanSetlistId(req.params.id)) {
+      return res.status(400).json({ message: `Invalid setlist id: ${req.params.id}` })
     }
 
-    const setlist = await Setlist.findOne({
-      _id: cleanId,
-      user: req.user._id,
-    })
-
+    const setlist = await findAccessibleSetlist(req)
     if (!setlist) {
       return res.status(404).json({ message: 'Setlist not found' })
     }
@@ -61,7 +93,7 @@ exports.updateSetlist = async (req, res) => {
   }
 }
 
-// 🔥 ADD SONGS TO SETLIST (THIS WAS MISSING)
+// ADD SONGS TO SETLIST
 exports.addSongsToSetlist = async (req, res) => {
   try {
     const { songIds } = req.body
@@ -70,49 +102,42 @@ exports.addSongsToSetlist = async (req, res) => {
       return res.status(400).json({ message: 'songIds must be an array' })
     }
 
-    const setlist = await Setlist.findOne({
-      _id: req.params.id,
-      user: req.user._id,
-    })
-
+    const setlist = await findAccessibleSetlist(req)
     if (!setlist) {
       return res.status(404).json({ message: 'Setlist not found' })
     }
 
-    // prevent duplicates
+    // prevent duplicates, and only songs from the same workspace
     const existing = setlist.songs.map(id => id.toString())
-    const toAdd = songIds.filter(id => !existing.includes(id))
+    const allowed = await sameWorkspaceSongIds(setlist, songIds)
+    const toAdd = allowed.filter(id => !existing.includes(String(id)))
 
     setlist.songs.push(...toAdd)
 
     await setlist.save()
 
-    const populated = await Setlist.findById(setlist._id).populate('songs')
-
-    res.json(populated)
+    res.json(await populateSetlist(setlist._id))
   } catch (err) {
     res.status(500).json({ message: err.message })
   }
 }
 
-// DELETE SETLIST
+// DELETE SETLIST — 만든 사람 또는 팀장만
 exports.deleteSetlist = async (req, res) => {
   try {
-    const cleanId = String(req.params.id).trim().replace(/^"|"$/g, '')
-
-    if (!mongoose.Types.ObjectId.isValid(cleanId)) {
-      return res.status(400).json({ message: `Invalid setlist id: ${cleanId}` })
+    if (!cleanSetlistId(req.params.id)) {
+      return res.status(400).json({ message: `Invalid setlist id: ${req.params.id}` })
     }
 
-    const deletedSetlist = await Setlist.findOneAndDelete({
-      _id: cleanId,
-      user: req.user._id,
-    })
-
-    if (!deletedSetlist) {
+    const setlist = await findAccessibleSetlist(req)
+    if (!setlist) {
       return res.status(404).json({ message: 'Setlist not found' })
     }
+    if (!(await canDelete(req.user, setlist))) {
+      return res.status(403).json({ message: '콘티를 만든 사람이나 팀장만 삭제할 수 있습니다' })
+    }
 
+    await setlist.deleteOne()
     res.json({ message: 'Setlist deleted successfully' })
   } catch (err) {
     res.status(500).json({ message: err.message })
@@ -125,13 +150,12 @@ exports.reorderSongs = async (req, res) => {
     const { songIds } = req.body
     if (!Array.isArray(songIds)) return res.status(400).json({ message: 'songIds must be an array' })
 
-    const setlist = await Setlist.findOne({ _id: req.params.id, user: req.user._id })
+    const setlist = await findAccessibleSetlist(req)
     if (!setlist) return res.status(404).json({ message: 'Setlist not found' })
 
-    setlist.songs = songIds
+    setlist.songs = await sameWorkspaceSongIds(setlist, songIds)
     await setlist.save()
-    const populated = await Setlist.findById(setlist._id).populate('songs')
-    res.json(populated)
+    res.json(await populateSetlist(setlist._id))
   } catch (err) {
     res.status(500).json({ message: err.message })
   }
@@ -140,7 +164,7 @@ exports.reorderSongs = async (req, res) => {
 // GENERATE / GET SHARE TOKEN
 exports.getShareToken = async (req, res) => {
   try {
-    const setlist = await Setlist.findOne({ _id: req.params.id, user: req.user._id })
+    const setlist = await findAccessibleSetlist(req)
     if (!setlist) return res.status(404).json({ message: 'Setlist not found' })
 
     if (!setlist.shareToken) {
@@ -213,11 +237,7 @@ exports.removeSongFromSetlist = async (req, res) => {
       return res.status(400).json({ message: 'songId is required' })
     }
 
-    const setlist = await Setlist.findOne({
-      _id: req.params.id,
-      user: req.user._id,
-    })
-
+    const setlist = await findAccessibleSetlist(req)
     if (!setlist) {
       return res.status(404).json({ message: 'Setlist not found' })
     }
@@ -228,11 +248,8 @@ exports.removeSongFromSetlist = async (req, res) => {
 
     await setlist.save()
 
-    const populated = await Setlist.findById(setlist._id).populate('songs')
-
-    res.json(populated)
+    res.json(await populateSetlist(setlist._id))
   } catch (err) {
     res.status(500).json({ message: err.message })
   }
 }
-

@@ -8,6 +8,7 @@ const {
   getTeamById,
   leaveTeam,
   deleteTeam,
+  moveMyItemsToTeam,
 } = require('../controllers/teamController')
 
 router.use(protect)
@@ -16,6 +17,7 @@ router.get('/', getMyTeams)
 router.post('/', createTeam)
 router.post('/join', joinTeam)
 router.get('/:id', getTeamById)
+router.post('/:id/move-my-items', moveMyItemsToTeam)
 router.delete('/:id/leave', leaveTeam)
 router.delete('/:id', deleteTeam)
 

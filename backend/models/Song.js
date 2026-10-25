@@ -60,6 +60,11 @@ const songSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
+    team: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Team',
+      default: null,
+    },
   },
   { timestamps: true }
 )

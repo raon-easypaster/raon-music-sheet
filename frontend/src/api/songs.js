@@ -1,7 +1,7 @@
 import { apiFetch } from './client'
 
-export function getSongs() {
-  return apiFetch('/songs')
+export function getSongs(team) {
+  return apiFetch(team ? `/songs?team=${team}` : '/songs')
 }
 
 export function getSongById(id) {

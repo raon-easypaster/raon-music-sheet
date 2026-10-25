@@ -1,4 +1,6 @@
 const Team = require('../models/Team')
+const Song = require('../models/Song')
+const Setlist = require('../models/Setlist')
 
 exports.createTeam = async (req, res) => {
   try {
@@ -77,8 +79,32 @@ exports.deleteTeam = async (req, res) => {
     const team = await Team.findOne({ _id: req.params.id, owner: req.user._id })
     if (!team) return res.status(404).json({ message: '팀을 찾을 수 없거나 권한이 없습니다' })
 
+    // 팀 곡·콘티는 지우지 않고 각각 만든 사람의 개인 공간으로 돌려보낸다
+    await Song.updateMany({ team: team._id }, { team: null })
+    await Setlist.updateMany({ team: team._id }, { team: null })
+
     await team.deleteOne()
-    res.json({ message: '팀이 삭제되었습니다' })
+    res.json({ message: '팀이 삭제되었습니다. 팀 곡·콘티는 각자 만든 사람의 개인 공간으로 옮겨졌습니다' })
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}
+
+// 내 개인 곡·콘티를 모두 이 팀의 공유 공간으로 옮긴다
+exports.moveMyItemsToTeam = async (req, res) => {
+  try {
+    const team = await Team.findOne({ _id: req.params.id, members: req.user._id })
+    if (!team) return res.status(404).json({ message: '팀을 찾을 수 없습니다' })
+
+    const mine = { user: req.user._id, team: null }
+    const songs = await Song.updateMany(mine, { team: team._id })
+    const setlists = await Setlist.updateMany(mine, { team: team._id })
+
+    res.json({
+      songs: songs.modifiedCount,
+      setlists: setlists.modifiedCount,
+      message: `곡 ${songs.modifiedCount}개, 콘티 ${setlists.modifiedCount}개를 '${team.name}' 팀으로 옮겼습니다`,
+    })
   } catch (err) {
     res.status(500).json({ message: err.message })
   }
