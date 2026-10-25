@@ -27,7 +27,7 @@
 | 데이터베이스 | MongoDB Atlas, Mongoose 8 |
 | 인증 | JWT (jsonwebtoken), bcryptjs |
 | 프론트 배포 | Vercel |
-| 백엔드 배포 | Railway |
+| 백엔드 배포 | Vercel 서버리스 함수 (`frontend/api/index.js` → `backend/app.js`) |
 | 사용법 가이드 | GitHub Pages |
 
 ---
@@ -88,6 +88,13 @@ PORT=8080
 VITE_API_URL=http://localhost:8080/api
 ```
 
+**Vercel 운영 환경 변수** (Project → Settings → Environment Variables)
+```
+MONGO_URI=MongoDB Atlas 접속 주소
+JWT_SECRET=로그인 토큰 서명용 임의의 긴 문자열
+```
+운영에서는 `VITE_API_URL`을 비워 두면 같은 주소의 `/api`를 사용합니다.
+
 ---
 
 ## 출처 및 참고
@@ -112,7 +119,7 @@ VITE_API_URL=http://localhost:8080/api
 - 구글 찬양 악보 검색 버튼
 - 비밀번호 변경 기능
 - 그린 계열 디자인 테마
-- Vercel + Railway 배포 설정
+- Vercel 배포 설정 (화면과 API를 한 프로젝트에서 서비스)
 
 ---
 

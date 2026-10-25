@@ -1,5 +1,7 @@
 {
+  "installCommand": "npm install && npm install --prefix ../backend --omit=dev",
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
