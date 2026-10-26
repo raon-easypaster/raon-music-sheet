@@ -22,7 +22,19 @@ function describeMongoUri(uri = '') {
     passwordHasSpaces: /\s/.test(pass),
     passwordHasNonAscii: /[^\x20-\x7e]/.test(pass),
     passwordHasBrackets: /[<>]/.test(pass),
+    passwordHasSpecialChars: /[^A-Za-z0-9]/.test(pass),
   }
+}
+
+// 비밀번호에 @ # % / 같은 특수문자가 그대로 들어 있으면 주소가 잘못 읽히므로, 비밀번호 부분만 URL 인코딩한다
+// (이미 인코딩된 값은 한 번 풀었다가 다시 인코딩하므로 두 번 인코딩되지 않는다)
+function normalizeMongoUri(uri = '') {
+  const m = uri.trim().match(/^(mongodb(?:\+srv)?:\/\/)([^:@/]+):(.*)@([^@]*)$/)
+  if (!m) return uri.trim()
+  const [, scheme, user, pass, rest] = m
+  let raw = pass
+  try { raw = decodeURIComponent(pass) } catch { /* %가 들어간 원문 비밀번호 */ }
+  return `${scheme}${user}:${encodeURIComponent(raw)}@${rest}`
 }
 
 // 서버리스(Vercel)에서는 함수가 새로 뜰 때마다 연결을 확인하고, 실패하면 다음 요청에서 다시 시도한다
@@ -31,7 +43,7 @@ function connectDB() {
   if (mongoose.connection.readyState === 1) return Promise.resolve()
   if (!process.env.MONGO_URI) return Promise.reject(new Error('MONGO_URI 환경 변수가 설정되지 않았습니다'))
   if (!connecting) {
-    connecting = mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 8000 })
+    connecting = mongoose.connect(normalizeMongoUri(process.env.MONGO_URI), { serverSelectionTimeoutMS: 8000 })
       .catch((err) => { connecting = null; throw err })
   }
   return connecting
