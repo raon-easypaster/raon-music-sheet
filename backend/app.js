@@ -9,6 +9,22 @@ const teamRoutes = require('./routes/teamRoutes')
 
 const app = express()
 
+// 접속 실패 원인을 찾기 위한 요약 (비밀번호 자체는 남기지 않는다)
+function describeMongoUri(uri = '') {
+  const m = uri.match(/^mongodb(?:\+srv)?:\/\/([^:]*):(.*)@([^@/?]+)(?:\/([^?]*))?/)
+  if (!m) return { format: 'unrecognized', length: uri.length }
+  const [, user, pass, host, db] = m
+  return {
+    user,
+    host,
+    db: db || '(none → test)',
+    passwordLength: pass.length,
+    passwordHasSpaces: /\s/.test(pass),
+    passwordHasNonAscii: /[^\x20-\x7e]/.test(pass),
+    passwordHasBrackets: /[<>]/.test(pass),
+  }
+}
+
 // 서버리스(Vercel)에서는 함수가 새로 뜰 때마다 연결을 확인하고, 실패하면 다음 요청에서 다시 시도한다
 let connecting = null
 function connectDB() {
@@ -28,7 +44,7 @@ app.use('/api', async (req, res, next) => {
     await connectDB()
     next()
   } catch (err) {
-    console.error('MongoDB error:', err.message)
+    console.error('MongoDB error:', err.message, describeMongoUri(process.env.MONGO_URI))
     res.status(503).json({ message: `데이터베이스에 연결하지 못했습니다: ${err.message}` })
   }
 })
