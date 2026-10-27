@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import SongViewer from './SongViewer'
+import FavoriteStar from './FavoriteStar'
+import { sortSongs, filterSongs } from '../utils/songSort'
 
 const KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
                'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'A#m', 'Bm']
@@ -12,21 +14,7 @@ const SORT_OPTIONS = [
   { value: 'bpm',     label: 'BPM순' },
 ]
 
-const KEY_ORDER = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
-                   'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'A#m', 'Bm']
-
-function sortSongs(songs, by) {
-  if (by === 'default') return songs
-  return [...songs].sort((a, b) => {
-    if (by === 'title')  return (a.title  || '').localeCompare(b.title  || '', 'ko')
-    if (by === 'artist') return (a.artist || '').localeCompare(b.artist || '', 'ko')
-    if (by === 'key')    return KEY_ORDER.indexOf(a.key || '') - KEY_ORDER.indexOf(b.key || '')
-    if (by === 'bpm')    return (a.bpm || 0) - (b.bpm || 0)
-    return 0
-  })
-}
-
-export default function SongList({ songs, showOwner, onDelete, onUpdate }) {
+export default function SongList({ songs, showOwner, canDelete = true, onDelete, onUpdate, onToggleFavorite }) {
   const [viewing,      setViewing]      = useState(null)
   const [editing,      setEditing]      = useState(null)
   const [editForm,     setEditForm]     = useState({})
@@ -35,6 +23,7 @@ export default function SongList({ songs, showOwner, onDelete, onUpdate }) {
   const [editError,    setEditError]    = useState('')
   const [search,       setSearch]       = useState('')
   const [sortBy,       setSortBy]       = useState('default')
+  const [favOnly,      setFavOnly]      = useState(false)
 
   function openEdit(song) {
     setEditing(song)
@@ -78,9 +67,8 @@ export default function SongList({ songs, showOwner, onDelete, onUpdate }) {
     return e => setEditForm(f => ({ ...f, [field]: e.target.value }))
   }
 
-  const filtered = songs.filter(s =>
-    [s.title, s.artist, s.key].some(v => v?.toLowerCase().includes(search.toLowerCase()))
-  )
+  const searched = filterSongs(songs, search)
+  const filtered = favOnly ? searched.filter((s) => s.isFavorite) : searched
   const sorted = sortSongs(filtered, sortBy)
 
   return (
@@ -90,10 +78,18 @@ export default function SongList({ songs, showOwner, onDelete, onUpdate }) {
           <h2 style={{ margin: 0 }}>
             전체 곡 목록
             <span className="muted" style={{ fontSize: 14, fontWeight: 400, marginLeft: 6 }}>
-              ({search ? `${filtered.length}/` : ''}{songs.length}곡)
+              ({search || favOnly ? `${filtered.length}/` : ''}{songs.length}곡)
             </span>
           </h2>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className={favOnly ? 'fav-filter on' : 'fav-filter'}
+              aria-pressed={favOnly}
+              onClick={() => setFavOnly((v) => !v)}
+            >
+              ★ 즐겨찾기만
+            </button>
             <input
               type="search"
               placeholder="제목·아티스트·코드 검색"
@@ -113,14 +109,19 @@ export default function SongList({ songs, showOwner, onDelete, onUpdate }) {
 
         {sorted.length === 0 && (
           <p className="muted">
-            {search ? `"${search}" 검색 결과가 없습니다` : '등록된 곡이 없습니다'}
+            {search ? `"${search}" 검색 결과가 없습니다`
+              : favOnly ? '즐겨찾기한 곡이 없습니다. 곡 제목 옆 ☆를 눌러 추가하세요'
+              : '등록된 곡이 없습니다'}
           </p>
         )}
 
         {sorted.map((song) => (
-          <div key={song._id} className="item-row">
+          <div key={song._id} className="item-row song-row">
             <div className="song-info">
-              <strong>{song.title}</strong>
+              <span className="song-title-row">
+                <FavoriteStar song={song} onToggle={onToggleFavorite} />
+                <strong>{song.title}</strong>
+              </span>
               <span className="muted">{song.artist}</span>
               {showOwner && song.user?.email && (
                 <span className="muted" style={{ fontSize: 12 }}>등록: {song.user.email}</span>
@@ -137,7 +138,7 @@ export default function SongList({ songs, showOwner, onDelete, onUpdate }) {
             <div className="song-actions">
               <button className="secondary" onClick={() => setViewing(song)}>보기</button>
               <button className="secondary" onClick={() => openEdit(song)}>수정</button>
-              <button onClick={() => onDelete(song._id)}>삭제</button>
+              {canDelete && <button onClick={() => onDelete(song._id)}>삭제</button>}
             </div>
           </div>
         ))}

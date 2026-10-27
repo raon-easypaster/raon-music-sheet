@@ -1,5 +1,18 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { getPublicCurrentSong, setPublicCurrentSong } from '../api/setlists'
+import { sortSongs, filterSongs, KEY_ORDER } from '../utils/songSort'
+import FavoriteStar from './FavoriteStar'
+
+const PICKER_SORTS = [
+  { value: 'key',    label: '코드순' },
+  { value: 'title',  label: '제목순' },
+  { value: 'artist', label: '아티스트순' },
+]
+const PICKER_VIEW_KEY = 'songPickerView'
+
+function loadPickerView() {
+  try { return localStorage.getItem(PICKER_VIEW_KEY) === 'card' ? 'card' : 'list' } catch { return 'list' }
+}
 
 function getYoutubeId(url) {
   if (!url) return null
@@ -14,11 +27,17 @@ export default function SetlistDetail({
   setlist,
   songs,
   onAddSongs,
+  onToggleFavorite,
   onRemoveSong,
   onReorder,
   onShare,
 }) {
   const [selectedSongIds, setSelectedSongIds] = useState([])
+  const [pickerSearch, setPickerSearch] = useState('')
+  const [pickerSort, setPickerSort] = useState('key')
+  const [pickerKey, setPickerKey] = useState('') // 코드순일 때 고른 코드 ('' = 전체)
+  const [pickerFavOnly, setPickerFavOnly] = useState(false)
+  const [pickerView, setPickerView] = useState(loadPickerView)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [shareLink,     setShareLink]     = useState(null)
@@ -74,6 +93,38 @@ export default function SetlistDetail({
   const availableSongs = useMemo(() => {
     return songs.filter((song) => !existingSongIds.includes(song._id))
   }, [songs, existingSongIds])
+
+  // 코드순일 때 위에 나열할 코드: 실제로 곡이 있는 코드만, 곡 수와 함께
+  // 검색어·즐겨찾기 조건을 먼저 적용한 목록 (코드 버튼의 곡 수도 이 기준)
+  const pickerBase = useMemo(() => {
+    const searched = filterSongs(availableSongs, pickerSearch)
+    return pickerFavOnly ? searched.filter((s) => s.isFavorite) : searched
+  }, [availableSongs, pickerSearch, pickerFavOnly])
+
+  const pickerKeyCounts = useMemo(() => {
+    const counts = new Map()
+    for (const song of pickerBase) {
+      const key = song.key || ''
+      counts.set(key, (counts.get(key) || 0) + 1)
+    }
+    const known = KEY_ORDER.filter((k) => counts.has(k)).map((k) => [k, counts.get(k)])
+    const others = [...counts].filter(([k]) => k && !KEY_ORDER.includes(k))
+    const none = counts.has('') ? [['', counts.get('')]] : []
+    return [...known, ...others, ...none.map(([, n]) => ['none', n])]
+  }, [pickerBase])
+
+  const pickerSongs = useMemo(() => {
+    let list = pickerBase
+    if (pickerSort === 'key' && pickerKey) {
+      list = list.filter((song) => (pickerKey === 'none' ? !song.key : song.key === pickerKey))
+    }
+    return sortSongs(list, pickerSort)
+  }, [pickerBase, pickerSort, pickerKey])
+
+  function changePickerView(view) {
+    setPickerView(view)
+    try { localStorage.setItem(PICKER_VIEW_KEY, view) } catch { /* 저장 못 해도 이번 화면에는 적용됨 */ }
+  }
 
   function toggleSong(songId) {
     setSelectedSongIds((prev) =>
@@ -421,28 +472,112 @@ export default function SetlistDetail({
           <p className="muted">추가할 수 있는 곡이 없습니다</p>
         ) : (
           <>
-            <div className="checkbox-list">
-              {availableSongs.map((song) => (
-                <label key={song._id} className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={selectedSongIds.includes(song._id)}
-                    onChange={() => toggleSong(song._id)}
-                  />
-                  <span>
-                    {song.title}
-                    {song.artist && ` — ${song.artist}`}
-                    {song.key && <span className="badge badge-key" style={{ marginLeft: 6 }}>{song.key}</span>}
-                  </span>
-                </label>
-              ))}
+            <div className="picker-toolbar">
+              <input
+                type="search"
+                placeholder="제목·아티스트·코드 검색"
+                value={pickerSearch}
+                onChange={(e) => setPickerSearch(e.target.value)}
+              />
+              <button
+                type="button"
+                className={pickerFavOnly ? 'fav-filter on' : 'fav-filter'}
+                aria-pressed={pickerFavOnly}
+                onClick={() => setPickerFavOnly((v) => !v)}
+              >
+                ★ 즐겨찾기만
+              </button>
+              <select value={pickerSort} onChange={(e) => setPickerSort(e.target.value)} aria-label="정렬">
+                {PICKER_SORTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <div className="view-toggle" role="group" aria-label="보기 방식">
+                <button
+                  type="button"
+                  className={pickerView === 'list' ? 'active' : ''}
+                  aria-pressed={pickerView === 'list'}
+                  onClick={() => changePickerView('list')}
+                >
+                  목록
+                </button>
+                <button
+                  type="button"
+                  className={pickerView === 'card' ? 'active' : ''}
+                  aria-pressed={pickerView === 'card'}
+                  onClick={() => changePickerView('card')}
+                >
+                  카드
+                </button>
+              </div>
             </div>
+
+            {pickerSort === 'key' && pickerKeyCounts.length > 0 && (
+              <div className="key-chips" role="group" aria-label="코드 선택">
+                <button
+                  type="button"
+                  className={pickerKey === '' ? 'active' : ''}
+                  aria-pressed={pickerKey === ''}
+                  onClick={() => setPickerKey('')}
+                >
+                  전체
+                </button>
+                {pickerKeyCounts.map(([key, count]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={pickerKey === key ? 'active' : ''}
+                    aria-pressed={pickerKey === key}
+                    onClick={() => setPickerKey(pickerKey === key ? '' : key)}
+                  >
+                    {key === 'none' ? '코드 없음' : key} <span className="chip-count">{count}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {pickerSongs.length === 0 ? (
+              <p className="muted">
+                {pickerSearch ? `"${pickerSearch}" 검색 결과가 없습니다`
+                  : pickerFavOnly ? '즐겨찾기한 곡이 없습니다'
+                  : '이 코드의 곡이 없습니다'}
+              </p>
+            ) : (
+              <div className={`song-picker song-picker-${pickerView}`}>
+                {pickerSongs.map((song) => {
+                  const checked = selectedSongIds.includes(song._id)
+                  return (
+                    <label key={song._id} className={checked ? 'picker-item selected' : 'picker-item'}>
+                      <input type="checkbox" checked={checked} onChange={() => toggleSong(song._id)} />
+                      {pickerView === 'card' ? (
+                        <span className="picker-card-body">
+                          <span className="song-title-row">
+                            <FavoriteStar song={song} onToggle={onToggleFavorite} />
+                            <strong>{song.title}</strong>
+                          </span>
+                          {song.artist && <span className="muted">{song.artist}</span>}
+                          <span className="badge-row">
+                            {song.key && <span className="badge badge-key">{song.key}</span>}
+                            {song.bpm > 0 && <span className="badge badge-bpm">{song.bpm} BPM</span>}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="picker-list-body">
+                          <FavoriteStar song={song} onToggle={onToggleFavorite} />
+                          {song.key && <span className="badge badge-key">{song.key}</span>}
+                          <span className="picker-title">{song.title}</span>
+                          {song.artist && <span className="muted picker-artist">{song.artist}</span>}
+                        </span>
+                      )}
+                    </label>
+                  )
+                })}
+              </div>
+            )}
 
             <button
               onClick={handleAddSongs}
               disabled={submitting || selectedSongIds.length === 0}
             >
-              {submitting ? '처리 중...' : '선택한 곡 추가'}
+              {submitting ? '처리 중...' : `선택한 곡 추가${selectedSongIds.length ? ` (${selectedSongIds.length})` : ''}`}
             </button>
           </>
         )}

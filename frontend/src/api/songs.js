@@ -22,6 +22,13 @@ export function updateSong(id, payload) {
   })
 }
 
+export function setFavorite(id, favorite) {
+  return apiFetch(`/songs/${id}/favorite`, {
+    method: 'PUT',
+    body: JSON.stringify({ favorite }),
+  })
+}
+
 export function deleteSong(id) {
   return apiFetch(`/songs/${id}`, { method: 'DELETE' })
 }

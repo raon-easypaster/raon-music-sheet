@@ -26,6 +26,12 @@ exports.accessFilter = async (user) => {
   }
 }
 
+exports.isTeamOwner = async (user, teamId) => {
+  if (!teamId) return false
+  const team = await Team.findById(teamId, 'owner')
+  return !!team && team.owner.toString() === user._id.toString()
+}
+
 // 삭제는 만든 사람 또는 팀장만
 exports.canDelete = async (user, doc) => {
   if (doc.user.toString() === user._id.toString()) return true

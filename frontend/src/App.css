@@ -193,6 +193,10 @@ button:hover {
   flex-shrink: 0;
 }
 
+.song-row .song-info { min-width: 0; }
+/* .muted는 초록 배경용 밝은 회색이라 흰 카드 위 곡 정보에는 진한 회색을 쓴다 */
+.song-row .muted { color: #64748b; }
+
 .item-row {
   display: flex;
   justify-content: space-between;
@@ -393,6 +397,46 @@ button:hover {
 .checkbox-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
 .checkbox-row { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; }
 
+/* ===== 콘티의 곡 선택 창 ===== */
+.picker-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.picker-toolbar input[type="search"] { flex: 1 1 180px; width: auto; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 14px; }
+.picker-toolbar select { padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 14px; }
+.view-toggle { display: inline-flex; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
+.view-toggle button { padding: 7px 14px; border-radius: 0; background: white; color: #475569; font-size: 13px; }
+.view-toggle button.active { background: #14532d; color: white; }
+
+/* ===== 즐겨찾기 ===== */
+.song-title-row { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.fav-star { padding: 0 2px; background: none; color: #94a3b8; font-size: 18px; line-height: 1; border-radius: 4px; flex: none; }
+.fav-star.on { color: #eab308; }
+.fav-filter { padding: 7px 12px; border-radius: 10px; background: white; color: #475569; border: 1px solid #e2e8f0; font-size: 13px; }
+.fav-filter.on { background: #fef9c3; color: #854d0e; border-color: #eab308; }
+
+.key-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.key-chips button { padding: 5px 11px; border-radius: 999px; background: #f1f5f9; color: #0f172a; font-size: 13px; border: 1px solid #e2e8f0; }
+.key-chips button.active { background: #14532d; color: white; border-color: #14532d; }
+.chip-count { opacity: 0.6; font-size: 11px; margin-left: 2px; }
+
+.song-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 12px; }
+.picker-item { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; min-width: 0; }
+.picker-item input[type="checkbox"] { width: auto; flex: none; margin: 0; }
+.picker-item.selected { border-color: #16a34a; background: #f0fdf4; }
+
+.song-picker-list .picker-item { padding: 7px 10px; }
+/* 제목·아티스트가 잘리지 않도록 칸이 좁으면 줄을 바꾼다 */
+.picker-list-body { display: flex; flex-wrap: wrap; align-items: center; column-gap: 6px; row-gap: 2px; min-width: 0; }
+.picker-title { overflow-wrap: anywhere; }
+.picker-artist { font-size: 12px; overflow-wrap: anywhere; }
+/* .muted는 초록 배경용 밝은 회색이라 흰 카드 위에서는 진한 회색을 쓴다 */
+.song-picker .muted { color: #64748b; }
+
+.song-picker-card { gap: 10px; }
+.song-picker-card .picker-item { align-items: flex-start; padding: 12px; }
+.picker-card-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.picker-card-body strong { overflow-wrap: anywhere; }
+.picker-card-body .song-title-row { align-items: flex-start; }
+.picker-card-body .muted { font-size: 13px; }
+
 /* ===== 콘티 2-column grid ===== */
 
 .conti-grid {
@@ -440,4 +484,19 @@ button:hover {
 
 @media (max-width: 1024px) {
   .tools-grid { grid-template-columns: 1fr 1fr !important; }
+}
+
+/* 곡 선택 창: 넓은 화면 3열 → 태블릿 2열 → 휴대폰은 목록 1열 · 카드 2열 */
+@media (max-width: 900px) {
+  .song-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 600px) {
+  /* 휴대폰: 곡 정보는 한 줄 전체를 쓰고, 보기·수정·삭제 버튼은 그 아래로 */
+  .song-row { flex-direction: column; gap: 8px; }
+  .song-row .song-actions { width: 100%; }
+  .song-row .song-actions button { flex: 1; }
+  .song-picker-list { grid-template-columns: 1fr; }
+  .song-picker-list .picker-item { padding: 10px 12px; }
+  .picker-toolbar input[type="search"] { flex-basis: 100%; }
 }
