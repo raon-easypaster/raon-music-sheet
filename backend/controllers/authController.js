@@ -15,7 +15,8 @@ const validateEmailAndPassword = (email, password) => {
   if (!email || !password) {
     return '이메일과 비밀번호를 입력해 주세요'
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  // 길이를 먼저 제한하고(이메일 표준 최대 254자), 겹치지 않는 패턴으로 검사해 느려지는 입력을 막는다
+  if (email.length > 254 || !/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(email)) {
     return '이메일 주소 형식이 올바르지 않습니다 (예: name@gmail.com)'
   }
   if (password.length < 6) {
