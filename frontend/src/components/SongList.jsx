@@ -1,6 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import SongViewer from './SongViewer'
 import FavoriteStar from './FavoriteStar'
+import SheetPhotoButton from './SheetPhotoButton'
+import { exportSongsCsv, exportBackupJson } from '../utils/exporters'
+import { formatKoreanDate, isoToDateInput, toDateInput } from '../utils/dates'
 import { sortSongs, filterSongs } from '../utils/songSort'
 
 const KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
@@ -14,7 +17,7 @@ const SORT_OPTIONS = [
   { value: 'bpm',     label: 'BPM순' },
 ]
 
-export default function SongList({ songs, showOwner, canDelete = true, onDelete, onUpdate, onToggleFavorite }) {
+export default function SongList({ songs, setlists = [], workspaceLabel = '개인', showOwner, canDelete = true, onDelete, onUpdate, onToggleFavorite }) {
   const [viewing,      setViewing]      = useState(null)
   const [editing,      setEditing]      = useState(null)
   const [editForm,     setEditForm]     = useState({})
@@ -67,6 +70,21 @@ export default function SongList({ songs, showOwner, canDelete = true, onDelete,
     return e => setEditForm(f => ({ ...f, [field]: e.target.value }))
   }
 
+  // 곡마다 마지막으로 부른 날 (오늘까지의 콘티 날짜 중 가장 최근)
+  const lastSung = useMemo(() => {
+    const today = toDateInput(new Date())
+    const map = new Map()
+    for (const sl of setlists) {
+      const date = isoToDateInput(sl.gigDate)
+      if (!date || date > today) continue
+      for (const s of sl.songs || []) {
+        const id = typeof s === 'string' ? s : s._id
+        if (!map.has(id) || map.get(id) < date) map.set(id, date)
+      }
+    }
+    return map
+  }, [setlists])
+
   const searched = filterSongs(songs, search)
   const filtered = favOnly ? searched.filter((s) => s.isFavorite) : searched
   const sorted = sortSongs(filtered, sortBy)
@@ -104,6 +122,14 @@ export default function SongList({ songs, showOwner, canDelete = true, onDelete,
             >
               {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
+            <button type="button" className="fav-filter" onClick={() => exportSongsCsv(sorted, workspaceLabel)} disabled={!songs.length}
+              title="지금 보이는 곡 목록을 엑셀에서 열 수 있는 파일로 받기">
+              ⬇ 엑셀
+            </button>
+            <button type="button" className="fav-filter" onClick={() => exportBackupJson(songs, setlists, workspaceLabel)} disabled={!songs.length}
+              title="이 작업 공간의 곡과 콘티 전체를 백업 파일로 받기">
+              ⬇ 백업
+            </button>
           </div>
         </div>
 
@@ -123,6 +149,9 @@ export default function SongList({ songs, showOwner, canDelete = true, onDelete,
                 <strong>{song.title}</strong>
               </span>
               <span className="muted">{song.artist}</span>
+              {lastSung.get(song._id) && (
+                <span className="muted" style={{ fontSize: 12 }}>마지막으로 부른 날: {formatKoreanDate(lastSung.get(song._id))}</span>
+              )}
               {showOwner && song.user?.email && (
                 <span className="muted" style={{ fontSize: 12 }}>등록: {song.user.email}</span>
               )}
@@ -182,7 +211,11 @@ export default function SongList({ songs, showOwner, canDelete = true, onDelete,
                 <div className="expanded-fields">
                   <input type="url" placeholder="YouTube URL (예배곡 영상)" value={editForm.youtubeUrl} onChange={set('youtubeUrl')} />
                   <input type="url" placeholder="MR / 반주 URL" value={editForm.mrUrl} onChange={set('mrUrl')} />
-                  <input type="url" placeholder="악보 이미지 URL" value={editForm.sheetImageUrl} onChange={set('sheetImageUrl')} />
+                  <input type="text" inputMode="url" placeholder="악보 이미지 URL (또는 아래에서 사진 올리기)" value={editForm.sheetImageUrl} onChange={set('sheetImageUrl')} />
+                  <SheetPhotoButton
+                    title={editForm.title}
+                    onUploaded={(url) => setEditForm((f) => ({ ...f, sheetImageUrl: url }))}
+                  />
                   <input type="url" placeholder="악보 PDF URL" value={editForm.sheetPdfUrl} onChange={set('sheetPdfUrl')} />
                   <input type="text" placeholder="송폼 구조 (예: Intro - Verse - Chorus - Bridge)" value={editForm.structure} onChange={set('structure')} />
                   <textarea placeholder="메모 (연주 포인트, 전조 등)" value={editForm.notes} onChange={set('notes')} rows={3} />

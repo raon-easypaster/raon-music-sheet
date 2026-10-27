@@ -1,5 +1,6 @@
 const mongoose = require('mongoose')
 const crypto = require('crypto')
+const bcrypt = require('bcryptjs')
 const Setlist = require('../models/Setlist')
 const Song = require('../models/Song')
 const { resolveWorkspace, accessFilter, canDelete, FORBIDDEN_WORKSPACE } = require('../utils/access')
@@ -178,25 +179,41 @@ exports.getShareToken = async (req, res) => {
 }
 
 // PUBLIC VIEW BY TOKEN (no auth)
+// 공유 비밀번호가 걸린 콘티는 x-share-pin 헤더가 맞아야 한다
+async function checkSharePin(setlist, req) {
+  if (!setlist.sharePinHash) return true
+  const pin = String(req.headers['x-share-pin'] || '')
+  return !!pin && bcrypt.compare(pin, setlist.sharePinHash)
+}
+
 exports.getPublicSetlist = async (req, res) => {
   try {
     const setlist = await Setlist.findOne({ shareToken: req.params.token }).populate('songs')
     if (!setlist) return res.status(404).json({ message: '유효하지 않은 링크입니다' })
+    if (!(await checkSharePin(setlist, req))) {
+      return res.status(401).json({ message: '이 콘티는 비밀번호가 필요합니다', needPin: true })
+    }
 
+    const settings = new Map((setlist.songSettings || []).map((s) => [s.song.toString(), s]))
     res.json({
       name: setlist.name,
-      songs: setlist.songs.map(s => ({
-        _id: s._id,
-        title: s.title,
-        artist: s.artist,
-        key: s.key,
-        bpm: s.bpm,
-        youtubeUrl: s.youtubeUrl,
-        mrUrl: s.mrUrl,
-        sheetImageUrl: s.sheetImageUrl,
-        sheetPdfUrl: s.sheetPdfUrl,
-        notes: s.notes,
-      }))
+      gigDate: setlist.gigDate || null,
+      songs: setlist.songs.map(s => {
+        const own = settings.get(s._id.toString())
+        return {
+          _id: s._id,
+          title: s.title,
+          artist: s.artist,
+          key: own?.key || s.key,
+          bpm: s.bpm,
+          youtubeUrl: s.youtubeUrl,
+          mrUrl: s.mrUrl,
+          sheetImageUrl: s.sheetImageUrl,
+          sheetPdfUrl: s.sheetPdfUrl,
+          structure: s.structure,
+          notes: [own?.notes, s.notes].filter(Boolean).join('\n'),
+        }
+      })
     })
   } catch (err) {
     res.status(500).json({ message: err.message })
@@ -224,6 +241,10 @@ exports.setPublicCurrentSong = async (req, res) => {
   const { index } = req.body
   if (typeof index !== 'number') return res.status(400).json({ message: 'index required' })
   const token = req.params.token
+  const locked = await Setlist.findOne({ shareToken: token }, 'sharePinHash')
+  if (locked && !(await checkSharePin(locked, req))) {
+    return res.status(401).json({ message: '이 콘티는 비밀번호가 필요합니다', needPin: true })
+  }
   currentSongMap.set(token, index)
   Setlist.updateOne({ shareToken: token }, { currentSongIdx: index }).catch(() => {})
   res.json({ index })
@@ -245,10 +266,92 @@ exports.removeSongFromSetlist = async (req, res) => {
     setlist.songs = setlist.songs.filter(
       (id) => id.toString() !== songId.toString()
     )
+    setlist.songSettings = (setlist.songSettings || []).filter(
+      (s) => s.song.toString() !== songId.toString()
+    )
 
     await setlist.save()
 
     res.json(await populateSetlist(setlist._id))
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}
+
+// POST /setlists/:id/duplicate — 같은 작업 공간에 곡·순서·콘티별 설정까지 복사한 새 콘티를 만든다
+exports.duplicateSetlist = async (req, res) => {
+  try {
+    const source = await findAccessibleSetlist(req)
+    if (!source) return res.status(404).json({ message: 'Setlist not found' })
+
+    const copy = await Setlist.create({
+      name: (req.body.name || '').trim() || `${source.name} (복사)`,
+      gigDate: req.body.gigDate || null,
+      venue: source.venue,
+      notes: source.notes,
+      songs: source.songs,
+      songSettings: source.songSettings,
+      team: source.team,
+      user: req.user._id,
+    })
+    res.status(201).json(await populateSetlist(copy._id))
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}
+
+// PUT /setlists/:id/song-settings/:songId  { key, notes } — 이 콘티에서만 쓸 Key·메모 (둘 다 비우면 원래대로)
+exports.updateSongSettings = async (req, res) => {
+  try {
+    const setlist = await findAccessibleSetlist(req)
+    if (!setlist) return res.status(404).json({ message: 'Setlist not found' })
+
+    const songId = String(req.params.songId)
+    if (!setlist.songs.some((id) => id.toString() === songId)) {
+      return res.status(404).json({ message: '이 콘티에 없는 곡입니다' })
+    }
+
+    const key = String(req.body.key || '').trim().slice(0, 10)
+    const notes = String(req.body.notes || '').trim().slice(0, 1000)
+    const others = (setlist.songSettings || []).filter((s) => s.song.toString() !== songId)
+    setlist.songSettings = key || notes ? [...others, { song: songId, key, notes }] : others
+    await setlist.save()
+
+    res.json(await populateSetlist(setlist._id))
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}
+
+// PUT /setlists/:id/share-pin  { pin } — 숫자 4~8자리. 빈 값이면 비밀번호를 해제한다
+exports.setSharePin = async (req, res) => {
+  try {
+    const setlist = await findAccessibleSetlist(req)
+    if (!setlist) return res.status(404).json({ message: 'Setlist not found' })
+
+    const pin = String(req.body.pin ?? '').trim()
+    if (pin && !/^\d{4,8}$/.test(pin)) {
+      return res.status(400).json({ message: '공유 비밀번호는 숫자 4~8자리로 정해 주세요' })
+    }
+    setlist.sharePinHash = pin ? await bcrypt.hash(pin, await bcrypt.genSalt(10)) : null
+    await setlist.save()
+    res.json({ hasSharePin: !!pin })
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}
+
+// PUT /setlists/:id/current  { index } — 로그인한 팀원이 콘티 화면에서 곡을 넘길 때 (공유 비밀번호 없이)
+exports.setCurrentSong = async (req, res) => {
+  try {
+    const { index } = req.body
+    if (typeof index !== 'number') return res.status(400).json({ message: 'index required' })
+    const setlist = await findAccessibleSetlist(req)
+    if (!setlist) return res.status(404).json({ message: 'Setlist not found' })
+    if (setlist.shareToken) currentSongMap.set(setlist.shareToken, index)
+    setlist.currentSongIdx = index
+    await setlist.save()
+    res.json({ index })
   } catch (err) {
     res.status(500).json({ message: err.message })
   }

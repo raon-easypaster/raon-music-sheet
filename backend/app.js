@@ -6,6 +6,7 @@ const songRoutes = require('./routes/songRoutes')
 const setlistRoutes = require('./routes/setlistRoutes')
 const authRoutes = require('./routes/authRoutes')
 const teamRoutes = require('./routes/teamRoutes')
+const sheetRoutes = require('./routes/sheetRoutes')
 
 const app = express()
 
@@ -50,7 +51,7 @@ function connectDB() {
 }
 
 app.use(cors())
-app.use(express.json())
+app.use(express.json({ limit: '6mb' })) // 악보 사진(base64) 업로드용
 app.use('/api', async (req, res, next) => {
   try {
     await connectDB()
@@ -64,6 +65,7 @@ app.use('/api/songs', songRoutes)
 app.use('/api/setlists', setlistRoutes)
 app.use('/api/teams', teamRoutes)
 app.use('/api/auth', authRoutes)
+app.use('/api/sheets', sheetRoutes)
 
 app.get('/', (req, res) => {
   res.send('RAON music sheet API running')

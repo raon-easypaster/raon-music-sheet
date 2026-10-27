@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
-import { getPublicCurrentSong, setPublicCurrentSong } from '../api/setlists'
+import { getPublicCurrentSong, setCurrentSong } from '../api/setlists'
 import { sortSongs, filterSongs, KEY_ORDER } from '../utils/songSort'
 import FavoriteStar from './FavoriteStar'
+import PrintView from './PrintView'
+import { formatKoreanDate, isoToDateInput, addDays, nextSunday } from '../utils/dates'
 
 const PICKER_SORTS = [
   { value: 'key',    label: '코드순' },
@@ -31,6 +33,10 @@ export default function SetlistDetail({
   onRemoveSong,
   onReorder,
   onShare,
+  onUpdateSetlist,
+  onDuplicate,
+  onSongSettings,
+  onSharePin,
 }) {
   const [selectedSongIds, setSelectedSongIds] = useState([])
   const [pickerSearch, setPickerSearch] = useState('')
@@ -48,6 +54,11 @@ export default function SetlistDetail({
   const [showPlayer,    setShowPlayer]    = useState(false)
   const [playerIdx,     setPlayerIdx]     = useState(0)
   const [practiced,     setPracticed]     = useState({})
+  const [showPrint,     setShowPrint]     = useState(false)
+  const [settingsSong,  setSettingsSong]  = useState(null)   // Key·메모를 고치는 중인 곡
+  const [settingsForm,  setSettingsForm]  = useState({ key: '', notes: '' })
+  const [pinInput,      setPinInput]      = useState('')
+  const [pinMsg,        setPinMsg]        = useState('')
 
   // drag state
   const dragIndex = useRef(null)
@@ -62,11 +73,10 @@ export default function SetlistDetail({
     setConductorIdx(0)
     setShowPlayer(false)
     setPlayerIdx(0)
-    if (setlist?.songs) {
-      setLocalSongs(setlist.songs.filter(s => typeof s !== 'string'))
-    } else {
-      setLocalSongs([])
-    }
+    setShowPrint(false)
+    setSettingsSong(null)
+    setPinInput('')
+    setPinMsg('')
     // 연습완료 localStorage 복원
     if (setlist?._id) {
       try {
@@ -74,7 +84,12 @@ export default function SetlistDetail({
         setPracticed(saved ? JSON.parse(saved) : {})
       } catch { setPracticed({}) }
     }
-  }, [setlist?._id, setlist?.songs])
+  }, [setlist?._id])
+
+  // 저장 후 다시 불러온 곡 목록은 화면 상태(공유 링크 등)를 건드리지 않고 반영한다
+  useEffect(() => {
+    setLocalSongs(setlist?.songs ? setlist.songs.filter(s => typeof s !== 'string') : [])
+  }, [setlist?.songs])
 
   function togglePracticed(songId) {
     if (!setlist?._id) return
@@ -89,6 +104,19 @@ export default function SetlistDetail({
     if (!setlist?.songs) return []
     return setlist.songs.map((song) => (typeof song === 'string' ? song : song._id))
   }, [setlist])
+
+  // 이 콘티에서만 쓰는 Key·메모 (곡 원본은 그대로)
+  const settingsMap = useMemo(
+    () => new Map((setlist?.songSettings || []).map((s) => [String(s.song), s])),
+    [setlist]
+  )
+  const displaySongs = useMemo(
+    () => localSongs.map((s) => {
+      const own = settingsMap.get(s._id)
+      return { ...s, displayKey: own?.key || s.key, keyOverridden: !!own?.key, displayNotes: own?.notes || '' }
+    }),
+    [localSongs, settingsMap]
+  )
 
   const availableSongs = useMemo(() => {
     return songs.filter((song) => !existingSongIds.includes(song._id))
@@ -215,7 +243,42 @@ export default function SetlistDetail({
   async function conductGo(idx) {
     if (!shareToken || idx < 0 || idx >= localSongs.length) return
     setConductorIdx(idx)
-    try { await setPublicCurrentSong(shareToken, idx) } catch {}
+    try { await setCurrentSong(setlist._id, idx) } catch { /* 다음 폴링 때 다시 맞춰진다 */ }
+  }
+
+  async function changeDate(value) {
+    try { await onUpdateSetlist(setlist._id, { gigDate: value || null }) } catch (err) { setError(err.message) }
+  }
+
+  async function handleDuplicate() {
+    // 다음 예배일: 원래 콘티 날짜 + 7일, 날짜가 없으면 다가오는 주일
+    const base = isoToDateInput(setlist.gigDate)
+    const gigDate = base ? addDays(base, 7) : nextSunday()
+    const name = window.prompt('복제한 콘티의 이름', `${setlist.name} (복사)`)
+    if (name === null) return
+    try { await onDuplicate(setlist._id, { name, gigDate }) } catch (err) { setError(err.message) }
+  }
+
+  function openSettings(song) {
+    const own = settingsMap.get(song._id)
+    setSettingsSong(song)
+    setSettingsForm({ key: own?.key || '', notes: own?.notes || '' })
+  }
+
+  async function saveSettings(reset = false) {
+    try {
+      await onSongSettings(setlist._id, settingsSong._id, reset ? { key: '', notes: '' } : settingsForm)
+      setSettingsSong(null)
+    } catch (err) { setError(err.message) }
+  }
+
+  async function savePin(clear = false) {
+    setPinMsg('')
+    try {
+      const res = await onSharePin(setlist._id, clear ? '' : pinInput)
+      setPinInput('')
+      setPinMsg(res.hasSharePin ? '공유 비밀번호를 걸었습니다. 링크와 비밀번호를 함께 알려 주세요.' : '공유 비밀번호를 해제했습니다.')
+    } catch (err) { setPinMsg(err.message) }
   }
 
   function copyLink() {
@@ -226,13 +289,15 @@ export default function SetlistDetail({
 
   function copySummary() {
     if (!setlist) return
-    const lines = [`📋 ${setlist.name}`, '']
-    localSongs.forEach((s, i) => {
+    const heading = [setlist.gigDate && formatKoreanDate(setlist.gigDate), setlist.name].filter(Boolean).join(' ')
+    const lines = [`📋 ${heading}`, '']
+    displaySongs.forEach((s, i) => {
       let line = `${i + 1}. ${s.title}`
       if (s.artist) line += ` (${s.artist})`
-      if (s.key) line += ` | Key ${s.key}`
+      if (s.displayKey) line += ` | Key ${s.displayKey}`
       if (s.bpm > 0) line += ` | BPM ${s.bpm}`
       if (s.structure) line += `\n   ${s.structure}`
+      if (s.displayNotes) line += `\n   📝 ${s.displayNotes}`
       lines.push(line)
     })
     if (shareLink) { lines.push(''); lines.push(`🔗 ${shareLink}`) }
@@ -253,7 +318,17 @@ export default function SetlistDetail({
   return (
     <div className="card panel">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8, flexWrap: 'wrap' }}>
-        <h2 style={{ margin: 0 }}>{setlist.name}</h2>
+        <div>
+          <h2 style={{ margin: 0 }}>{setlist.name}</h2>
+          <label className="date-inline">
+            예배 날짜
+            <input
+              type="date"
+              value={isoToDateInput(setlist.gigDate)}
+              onChange={(e) => changeDate(e.target.value)}
+            />
+          </label>
+        </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {localSongs.some(s => s.youtubeUrl) && (
             <button
@@ -269,6 +344,12 @@ export default function SetlistDetail({
           </button>
           <button type="button" className="secondary" style={{ fontSize: 13 }} onClick={handleShare}>
             🔗 공유 링크
+          </button>
+          <button type="button" className="secondary" style={{ fontSize: 13 }} onClick={() => setShowPrint(true)} disabled={!localSongs.length}>
+            🖨 인쇄·PDF
+          </button>
+          <button type="button" className="secondary" style={{ fontSize: 13 }} onClick={handleDuplicate}>
+            📄 복제
           </button>
         </div>
       </div>
@@ -320,7 +401,7 @@ export default function SetlistDetail({
         <>
           {/* 링크 표시줄 */}
           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '10px 14px', marginBottom: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12, flex: 1, wordBreak: 'break-all', color: '#166534' }}>{shareLink}</span>
+            <span className="share-link-text" style={{ fontSize: 12, flex: 1, wordBreak: 'break-all', color: '#166534' }}>{shareLink}</span>
             <button type="button" className="secondary" style={{ fontSize: 12, padding: '4px 10px' }} onClick={copyLink}>
               {copied ? '복사됨!' : '복사'}
             </button>
@@ -341,6 +422,30 @@ export default function SetlistDetail({
             </button>
           </div>
 
+          {/* 공유 비밀번호 (선택) */}
+          <div className="share-pin">
+            <span>
+              🔒 공유 비밀번호 {setlist.hasSharePin ? <b>걸려 있음</b> : <span className="muted-dark">없음 (링크만 있으면 누구나 볼 수 있음)</span>}
+            </span>
+            <span className="share-pin-form">
+              <input
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="숫자 4~8자리"
+                value={pinInput}
+                onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 8))}
+              />
+              <button type="button" className="secondary" onClick={() => savePin(false)} disabled={pinInput.length < 4}>
+                {setlist.hasSharePin ? '바꾸기' : '걸기'}
+              </button>
+              {setlist.hasSharePin && (
+                <button type="button" className="secondary" onClick={() => savePin(true)}>해제</button>
+              )}
+            </span>
+            {pinMsg && <span className="share-pin-msg">{pinMsg}</span>}
+          </div>
+
           {/* 진행 컨트롤러 */}
           {localSongs.length > 0 && (
             <div style={{ background: '#14532d', borderRadius: 12, padding: '12px 16px', marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -357,9 +462,9 @@ export default function SetlistDetail({
                 <div style={{ color: '#fff', fontWeight: 700, fontSize: 15, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
                   {localSongs[conductorIdx]?.title || '—'}
                 </div>
-                {localSongs[conductorIdx]?.key && (
+                {displaySongs[conductorIdx]?.displayKey && (
                   <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 }}>
-                    Key {localSongs[conductorIdx].key}
+                    Key {displaySongs[conductorIdx].displayKey}
                     {localSongs[conductorIdx].bpm > 0 && ` · ${localSongs[conductorIdx].bpm} BPM`}
                   </div>
                 )}
@@ -390,7 +495,7 @@ export default function SetlistDetail({
 
         {localSongs.length ? (
           <ul className="item-list">
-            {localSongs.map((song, idx) => (
+            {displaySongs.map((song, idx) => (
               <li
                 key={song._id}
                 className="item-row"
@@ -400,7 +505,7 @@ export default function SetlistDetail({
                 onDrop={handleDrop}
                 style={{ cursor: 'grab', userSelect: 'none', opacity: practiced[song._id] ? 0.6 : 1 }}
               >
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div className="setlist-song-inner" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   {/* 연습완료 체크박스 */}
                   <button
                     onClick={(e) => { e.stopPropagation(); togglePracticed(song._id) }}
@@ -429,14 +534,18 @@ export default function SetlistDetail({
                   )}
 
                   {/* 곡 정보 */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="setlist-song-info" style={{ flex: 1, minWidth: 0 }}>
                     <div>
                       <span className="song-order">{idx + 1}.</span>
                       <strong>{song.title}</strong>
                       {song.artist && <span className="muted"> — {song.artist}</span>}
                     </div>
                     <div className="badge-row">
-                      {song.key && <span className="badge badge-key">{song.key}</span>}
+                      {song.displayKey && (
+                        <span className="badge badge-key" title={song.keyOverridden ? `이 콘티에서만 ${song.displayKey} (원래 ${song.key || '없음'})` : undefined}>
+                          {song.displayKey}{song.keyOverridden && ` ← ${song.key || '-'}`}
+                        </span>
+                      )}
                       {song.capo > 0 && <span className="badge" style={{ background: '#fef9c3', color: '#854d0e' }}>카포 {song.capo}</span>}
                       {song.bpm > 0 && <span className="badge badge-bpm">{song.bpm} BPM</span>}
                     </div>
@@ -445,7 +554,18 @@ export default function SetlistDetail({
                         {song.structure}
                       </div>
                     )}
+                    {song.displayNotes && <div className="setlist-song-note">📝 {song.displayNotes}</div>}
                   </div>
+
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => openSettings(song)}
+                    style={{ flexShrink: 0, fontSize: 12 }}
+                    title="이 콘티에서만 쓸 Key·메모"
+                  >
+                    Key·메모
+                  </button>
 
                   <button
                     type="button"
@@ -462,6 +582,34 @@ export default function SetlistDetail({
           </ul>
         ) : (
           <p className="muted">콘티에 곡이 없습니다</p>
+        )}
+
+        {settingsSong && (
+          <div className="song-settings">
+            <b>‘{settingsSong.title}’ — 이 콘티에서만</b>
+            <span className="muted-dark">곡 목록의 원래 정보(Key {settingsSong.key || '없음'})는 바뀌지 않습니다.</span>
+            <label>
+              Key
+              <select value={settingsForm.key} onChange={(e) => setSettingsForm((f) => ({ ...f, key: e.target.value }))}>
+                <option value="">원래 Key 그대로 ({settingsSong.key || '없음'})</option>
+                {KEY_ORDER.map((k) => <option key={k} value={k}>{k}</option>)}
+              </select>
+            </label>
+            <label>
+              메모
+              <textarea
+                rows={2}
+                placeholder="예: 2절 후 간주 길게, 마지막 후렴 반복"
+                value={settingsForm.notes}
+                onChange={(e) => setSettingsForm((f) => ({ ...f, notes: e.target.value }))}
+              />
+            </label>
+            <span className="song-settings-actions">
+              <button type="button" onClick={() => saveSettings(false)}>저장</button>
+              <button type="button" className="secondary" onClick={() => saveSettings(true)}>원래대로</button>
+              <button type="button" className="secondary" onClick={() => setSettingsSong(null)}>취소</button>
+            </span>
+          </div>
         )}
       </div>
 
@@ -584,6 +732,8 @@ export default function SetlistDetail({
 
         {error ? <p className="error-text">{error}</p> : null}
       </div>
+
+      {showPrint && <PrintView setlist={setlist} songs={displaySongs} onClose={() => setShowPrint(false)} />}
     </div>
   )
 }

@@ -9,6 +9,10 @@ import {
   deleteSetlist,
   reorderSetlist,
   generateShareToken,
+  updateSetlist,
+  duplicateSetlist,
+  updateSongSettings,
+  setSharePin,
 } from '../api/setlists'
 import { changePasswordRequest } from '../api/auth'
 import { getMyTeams } from '../api/teams'
@@ -39,6 +43,8 @@ export default function Dashboard() {
   const [setlists, setSetlists] = useState([])
   const [selectedSetlistId, setSelectedSetlistId] = useState(null)
   const [loading, setLoading] = useState(true)
+  // 처음 한 번만 "불러오는 중"으로 화면을 바꾼다. 저장 후 새로고침 때는 화면(공유 링크 등)을 그대로 둔다
+  const [loadedOnce, setLoadedOnce] = useState(false)
   const [error, setError] = useState('')
   const [tab, setTab] = useState(0)
   // 팀장이 임시 비밀번호로 초기화한 계정은 로그인하자마자 비밀번호 변경 창을 띄운다
@@ -94,7 +100,7 @@ export default function Dashboard() {
     } catch (err) {
       if (loadId === latestLoad.current) setError(err.message || '데이터를 불러오지 못했습니다')
     } finally {
-      if (loadId === latestLoad.current) setLoading(false)
+      if (loadId === latestLoad.current) { setLoading(false); setLoadedOnce(true) }
     }
   }, [selectedSetlistId, workspace])
 
@@ -125,6 +131,14 @@ export default function Dashboard() {
   }
 
   async function handleShare(setlistId) { return generateShareToken(setlistId) }
+  async function handleUpdateSetlist(setlistId, payload) { await updateSetlist(setlistId, payload); await loadData() }
+  async function handleSongSettings(setlistId, songId, payload) { await updateSongSettings(setlistId, songId, payload); await loadData() }
+  async function handleSharePin(setlistId, pin) { const res = await setSharePin(setlistId, pin); await loadData(); return res }
+  async function handleDuplicate(setlistId, payload) {
+    const copy = await duplicateSetlist(setlistId, payload)
+    setSelectedSetlistId(copy._id)
+    await loadData()
+  }
 
   async function handleChangePassword(e) {
     e.preventDefault()
@@ -246,7 +260,7 @@ export default function Dashboard() {
         ))}
       </nav>
 
-      {loading ? (
+      {loading && !loadedOnce ? (
         <div className="card panel">불러오는 중...</div>
       ) : (
         <>
@@ -255,6 +269,8 @@ export default function Dashboard() {
               <SongForm onCreate={handleCreateSong} />
               <SongList
                 songs={songs}
+                setlists={setlists}
+                workspaceLabel={currentTeam ? currentTeam.name : '개인'}
                 showOwner={!!currentTeam}
                 canDelete={!currentTeam || currentTeam.owner?._id === user?._id}
                 onDelete={handleDeleteSong}
@@ -282,6 +298,10 @@ export default function Dashboard() {
                   onRemoveSong={handleRemoveSong}
                   onReorder={handleReorder}
                   onShare={handleShare}
+                  onUpdateSetlist={handleUpdateSetlist}
+                  onDuplicate={handleDuplicate}
+                  onSongSettings={handleSongSettings}
+                  onSharePin={handleSharePin}
                 />
               </div>
             </>

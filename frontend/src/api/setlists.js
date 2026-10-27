@@ -36,18 +36,21 @@ export function generateShareToken(id) {
   return apiFetch(`/setlists/${id}/share`, { method: 'POST' })
 }
 
-export function getPublicSetlist(token) {
-  return apiFetch(`/setlists/public/${token}`, { skipAuth: true })
+const pinHeader = (pin) => (pin ? { 'x-share-pin': pin } : {})
+
+export function getPublicSetlist(token, pin) {
+  return apiFetch(`/setlists/public/${token}`, { skipAuth: true, headers: pinHeader(pin) })
 }
 
 export function getPublicCurrentSong(token) {
   return apiFetch(`/setlists/public/${token}/current`, { skipAuth: true })
 }
 
-export function setPublicCurrentSong(token, index) {
+export function setPublicCurrentSong(token, index, pin) {
   return apiFetch(`/setlists/public/${token}/current`, {
     method: 'PUT',
     skipAuth: true,
+    headers: pinHeader(pin),
     body: JSON.stringify({ index }),
   })
 }
@@ -56,4 +59,24 @@ export function deleteSetlist(id) {
   return apiFetch(`/setlists/${id}`, {
     method: 'DELETE',
   })
+}
+
+export function updateSetlist(id, payload) {
+  return apiFetch(`/setlists/${id}`, { method: 'PUT', body: JSON.stringify(payload) })
+}
+
+export function duplicateSetlist(id, payload) {
+  return apiFetch(`/setlists/${id}/duplicate`, { method: 'POST', body: JSON.stringify(payload) })
+}
+
+export function updateSongSettings(id, songId, payload) {
+  return apiFetch(`/setlists/${id}/song-settings/${songId}`, { method: 'PUT', body: JSON.stringify(payload) })
+}
+
+export function setSharePin(id, pin) {
+  return apiFetch(`/setlists/${id}/share-pin`, { method: 'PUT', body: JSON.stringify({ pin }) })
+}
+
+export function setCurrentSong(id, index) {
+  return apiFetch(`/setlists/${id}/current`, { method: 'PUT', body: JSON.stringify({ index }) })
 }

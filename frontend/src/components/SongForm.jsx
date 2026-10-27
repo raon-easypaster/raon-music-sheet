@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import SheetPhotoButton from './SheetPhotoButton'
 
 const KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
                'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'A#m', 'Bm']
@@ -113,12 +114,18 @@ export default function SongForm({ onCreate }) {
             value={form.mrUrl}
             onChange={handleChange}
           />
+          {/* 올린 사진은 /api/sheets/... 주소라서 url 형식 검사를 하지 않는다 */}
           <input
-            type="url"
+            type="text"
+            inputMode="url"
             name="sheetImageUrl"
-            placeholder="악보 이미지 URL"
+            placeholder="악보 이미지 URL (또는 아래에서 사진 올리기)"
             value={form.sheetImageUrl}
             onChange={handleChange}
+          />
+          <SheetPhotoButton
+            title={form.title}
+            onUploaded={(url) => setForm((prev) => ({ ...prev, sheetImageUrl: url }))}
           />
           <input
             type="url"

@@ -24,6 +24,20 @@ const setlistSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // 공유 링크 비밀번호 (선택). bcrypt 암호로만 저장한다
+    sharePinHash: {
+      type: String,
+      default: null,
+    },
+    // 이 콘티에서만 쓰는 곡별 Key·메모 (곡 원본 정보는 그대로 둔다)
+    songSettings: [
+      {
+        _id: false,
+        song: { type: mongoose.Schema.Types.ObjectId, ref: 'Song', required: true },
+        key: { type: String, trim: true, default: '' },
+        notes: { type: String, trim: true, default: '' },
+      },
+    ],
     currentSongIdx: {
       type: Number,
       default: 0,
@@ -36,5 +50,14 @@ const setlistSchema = new mongoose.Schema(
   },
   { timestamps: true }
 )
+
+// 화면으로 보낼 때 공유 비밀번호 암호는 빼고, 설정 여부만 알려 준다
+setlistSchema.set('toJSON', {
+  transform(doc, ret) {
+    ret.hasSharePin = !!ret.sharePinHash
+    delete ret.sharePinHash
+    return ret
+  },
+})
 
 module.exports = mongoose.model('Setlist', setlistSchema)

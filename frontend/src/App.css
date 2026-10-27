@@ -496,7 +496,85 @@ button:hover {
   .song-row { flex-direction: column; gap: 8px; }
   .song-row .song-actions { width: 100%; }
   .song-row .song-actions button { flex: 1; }
+  /* 콘티 순서: 곡 정보가 한 줄을 넉넉히 쓰고, Key·메모·제거 버튼은 다음 줄로 */
+  .setlist-song-inner { flex-wrap: wrap; }
+  .setlist-song-info { min-width: 150px !important; }
+  .share-link-text { flex-basis: 100% !important; }
   .song-picker-list { grid-template-columns: 1fr; }
   .song-picker-list .picker-item { padding: 10px 12px; }
   .picker-toolbar input[type="search"] { flex-basis: 100%; }
+}
+/* ===== 콘티 날짜 · 월별 목록 ===== */
+.date-field { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+.form-card .date-field input { width: auto; margin: 0; }
+.date-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #475569; margin-top: 6px; }
+.date-inline input { width: auto; padding: 4px 8px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; }
+.setlist-month + .setlist-month { margin-top: 12px; }
+.setlist-month-label { font-size: 13px; color: #64748b; margin: 0 0 6px; }
+.setlist-pick { text-align: left; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
+.setlist-date { font-size: 12px; color: #15803d; font-weight: 700; }
+
+/* ===== 공유 비밀번호 ===== */
+.share-pin { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 12px; margin-bottom: 8px; font-size: 13px; }
+.share-pin-form { display: inline-flex; gap: 6px; align-items: center; }
+.share-pin-form input { width: 120px; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; }
+.share-pin-form button { padding: 6px 12px; font-size: 13px; }
+.share-pin-msg { width: 100%; color: #15803d; }
+.muted-dark { color: #64748b; font-size: 12px; }
+.pin-gate { max-width: 380px; margin: 60px auto; display: flex; flex-direction: column; gap: 12px; text-align: center; }
+.pin-gate input { text-align: center; font-size: 20px; letter-spacing: 4px; }
+
+/* ===== 콘티별 Key·메모 ===== */
+.setlist-song-info .muted { color: #64748b; }
+.setlist-song-note { font-size: 12px; color: #854d0e; background: #fef9c3; border-radius: 6px; padding: 2px 6px; margin-top: 4px; white-space: pre-wrap; }
+.song-settings { display: flex; flex-direction: column; gap: 8px; border: 1px solid #bbf7d0; background: #f0fdf4; border-radius: 12px; padding: 12px 14px; margin: 10px 0; font-size: 14px; }
+.song-settings label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
+.song-settings select, .song-settings textarea { width: 100%; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 8px; font: inherit; font-weight: 400; }
+.song-settings-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ===== 악보 사진 올리기 ===== */
+.sheet-photo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.sheet-photo button { padding: 8px 14px; font-size: 14px; }
+.sheet-photo-note { font-size: 12px; color: #64748b; }
+
+/* ===== 공유 화면 저작권 안내 ===== */
+.share-copyright { font-size: 11px; color: #64748b; text-align: center; padding: 8px 16px 14px; margin: 0; }
+
+/* ===== 인쇄 · PDF ===== */
+.print-overlay { position: fixed; inset: 0; z-index: 1000; background: #e5e7eb; overflow: auto; color: #0f172a; }
+.print-toolbar { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; background: #fff; border-bottom: 1px solid #d1d5db; padding: 10px 16px; font-size: 14px; }
+.print-toolbar label { display: inline-flex; align-items: center; gap: 6px; }
+.print-toolbar select { padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; }
+.print-toolbar .print-check input { width: auto; }
+.print-actions { display: inline-flex; gap: 8px; margin-left: auto; }
+.print-actions button { padding: 8px 14px; font-size: 14px; }
+.print-hint { width: 100%; margin: 0; font-size: 12px; color: #64748b; }
+.print-area { padding: 12px; }
+.print-page {
+  zoom: var(--preview-scale, 1);
+  margin: 0 auto 16px; background: #fff; box-shadow: 0 2px 10px rgba(0, 0, 0, .15);
+  padding: 8mm; display: flex; flex-direction: column; gap: 3mm; overflow: hidden; box-sizing: border-box;
+}
+.print-head { display: flex; justify-content: space-between; font-size: 10pt; font-weight: 700; border-bottom: 0.3mm solid #94a3b8; padding-bottom: 1.5mm; }
+.print-order { margin: 0; padding-left: 6mm; font-size: 9pt; columns: 2; column-gap: 8mm; }
+.print-order b { color: #15803d; }
+.print-grid { flex: 1; min-height: 0; display: grid; gap: 4mm; }
+.print-cell { margin: 0; min-height: 0; display: flex; flex-direction: column; border: 0.2mm solid #e2e8f0; border-radius: 1.5mm; padding: 2mm; overflow: hidden; }
+.print-cell figcaption { display: flex; justify-content: space-between; gap: 2mm; font-size: 9pt; margin-bottom: 1.5mm; }
+.print-key { color: #15803d; font-weight: 700; white-space: nowrap; }
+.print-cell img { flex: 1; min-height: 0; width: 100%; object-fit: contain; }
+.print-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2mm; color: #94a3b8; font-size: 10pt; text-align: center; }
+.print-empty small { font-size: 7pt; word-break: break-all; }
+.print-note { margin: 1.5mm 0 0; font-size: 8pt; color: #854d0e; white-space: pre-wrap; }
+.print-foot { font-size: 7pt; color: #64748b; border-top: 0.3mm solid #e2e8f0; padding-top: 1.5mm; line-height: 1.4; }
+
+@media print {
+  body * { visibility: hidden; }
+  .print-overlay, .print-overlay * { visibility: visible; }
+  .print-overlay { position: absolute; inset: 0 auto auto 0; overflow: visible; background: #fff; }
+  .print-toolbar, .no-print { display: none !important; }
+  .print-area { padding: 0; }
+  .print-page { zoom: 1; margin: 0; box-shadow: none; break-after: page; page-break-after: always; }
+  .print-page:last-child { break-after: auto; page-break-after: auto; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

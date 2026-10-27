@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { getPublicSetlist, getPublicCurrentSong, setPublicCurrentSong } from '../api/setlists'
+import { COPYRIGHT_NOTICE } from '../utils/copyright'
+import { formatKoreanDate } from '../utils/dates'
 
 function getYoutubeEmbedId(url) {
   if (!url) return null
@@ -21,13 +23,34 @@ export default function PublicSetlistView() {
   const [sheetOnly,     setSheetOnly]     = useState(searchParams.get('view') === 'sheet')
   const [showPageGrid,  setShowPageGrid]  = useState(false)
   const touchStartX = useRef(null)
+  // 공유 비밀번호가 걸린 콘티: 한 번 맞히면 이 탭이 열려 있는 동안 기억한다
+  const pinKey = `sharePin_${token}`
+  const [pin,      setPin]      = useState(() => { try { return sessionStorage.getItem(pinKey) || '' } catch { return '' } })
+  const [needPin,  setNeedPin]  = useState(false)
+  const [pinInput, setPinInput] = useState('')
+  const [pinError, setPinError] = useState('')
 
   useEffect(() => {
-    getPublicSetlist(token)
-      .then(data => setSetlist(data))
-      .catch(err => setError(err.message || '유효하지 않은 링크입니다'))
+    getPublicSetlist(token, pin)
+      .then(data => { setSetlist(data); setNeedPin(false) })
+      .catch(err => {
+        if (err.data?.needPin) {
+          setNeedPin(true)
+          if (pin) setPinError('비밀번호가 맞지 않습니다')
+        } else {
+          setError(err.message || '유효하지 않은 링크입니다')
+        }
+      })
       .finally(() => setLoading(false))
-  }, [token])
+  }, [token, pin])
+
+  function submitPin(e) {
+    e.preventDefault()
+    setPinError('')
+    try { sessionStorage.setItem(pinKey, pinInput) } catch { /* 저장 못 해도 이번 화면은 열린다 */ }
+    setLoading(true)
+    setPin(pinInput)
+  }
 
   // 3초마다 현재 곡 인덱스 동기화
   useEffect(() => {
@@ -47,7 +70,7 @@ export default function PublicSetlistView() {
     if (idx < 0 || idx >= (setlist?.songs?.length ?? 0)) return
     setCurrentIdx(idx)
     setShowPageGrid(false)
-    try { await setPublicCurrentSong(token, idx) } catch {}
+    try { await setPublicCurrentSong(token, idx, pin) } catch { /* 다음 동기화 때 다시 맞춰진다 */ }
   }
 
   function handleTouchStart(e) {
@@ -70,6 +93,26 @@ export default function PublicSetlistView() {
     </div>
   )
 
+  if (needPin) return (
+    <div className="dashboard">
+      <form className="card panel pin-gate" onSubmit={submitPin}>
+        <h2>🔒 비밀번호가 필요한 콘티입니다</h2>
+        <p>공유한 분에게 받은 숫자 비밀번호를 입력해 주세요.</p>
+        <input
+          type="password"
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="숫자 4~8자리"
+          value={pinInput}
+          onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 8))}
+          autoFocus
+        />
+        {pinError && <p className="error-text">{pinError}</p>}
+        <button type="submit" disabled={pinInput.length < 4}>열기</button>
+      </form>
+    </div>
+  )
+
   if (error) return (
     <div className="dashboard">
       <div className="card panel" style={{ textAlign: 'center', padding: 40 }}>
@@ -87,7 +130,7 @@ export default function PublicSetlistView() {
       <header className="topbar" style={{ flexShrink: 0 }}>
         <div>
           <h1>RAON music sheet</h1>
-          <p className="muted">{setlist.name}</p>
+          <p className="muted">{[setlist.gigDate && formatKoreanDate(setlist.gigDate), setlist.name].filter(Boolean).join(' · ')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button
@@ -314,6 +357,7 @@ export default function PublicSetlistView() {
           .mobile-song-bar { display: flex; }
         }
       `}</style>
+      {!sheetOnly && <p className="share-copyright">{COPYRIGHT_NOTICE}</p>}
     </div>
   )
 }
