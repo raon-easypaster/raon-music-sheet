@@ -3,6 +3,7 @@ const crypto = require('crypto')
 const bcrypt = require('bcryptjs')
 const Setlist = require('../models/Setlist')
 const Song = require('../models/Song')
+const PinAttempt = require('../models/PinAttempt')
 const { resolveWorkspace, accessFilter, canDelete, FORBIDDEN_WORKSPACE } = require('../utils/access')
 
 // In-memory current song index per share token (resets on server restart)
@@ -179,35 +180,61 @@ exports.getShareToken = async (req, res) => {
 }
 
 // PUBLIC VIEW BY TOKEN (no auth)
-// 공유 비밀번호가 걸린 콘티는 x-share-pin 헤더가 맞아야 한다.
-// 5번 틀리면 15분 동안 잠근다 → 'ok' | 'wrong' | 'locked'
-const PIN_MAX_FAILURES = 5
+// 공유 비밀번호가 걸린 콘티는 x-share-pin 헤더가 맞아야 한다 → 'ok' | 'wrong' | 'locked'
+// - 기기(IP)마다 5번 틀리면 그 기기만 15분 잠금 (다른 팀원은 영향 없음)
+// - 여러 기기에서 합쳐 30번 틀리면 링크 전체를 15분 잠금 (IP를 바꿔 가며 맞히기 방지)
+// - 시도는 비밀번호를 확인하기 "전에" 원자적으로 하나씩 예약하므로, 동시에 많이 보내도 한도를 넘지 못한다
 const PIN_LOCK_MS = 15 * 60 * 1000
+const PIN_LIMITS = { ip: 5, link: 30 }
+
+// Vercel은 X-Forwarded-For를 실제 접속 주소로 덮어쓰므로(위조 불가) 이것을 먼저 쓴다
+const clientIp = (req) =>
+  String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.socket?.remoteAddress || '')
+    .split(',')[0].trim()
+
+// 시도 하나를 예약한다. 잠겨 있거나 한도를 넘으면 false
+async function reserveAttempt(key, limit) {
+  const now = new Date()
+  let doc
+  try {
+    doc = await PinAttempt.findOneAndUpdate(
+      { key, $or: [{ lockedUntil: null }, { lockedUntil: { $lte: now } }] },
+      { $inc: { attempts: 1 }, $set: { expireAt: new Date(now.getTime() + PIN_LOCK_MS * 2), lockedUntil: null } },
+      { new: true, upsert: true }
+    )
+  } catch (err) {
+    if (err.code === 11000) return false // 잠긴 문서가 있어 새로 만들 수 없음 = 잠김
+    throw err
+  }
+  if (doc.attempts > limit) {
+    await PinAttempt.updateOne({ key }, { attempts: 0, lockedUntil: new Date(now.getTime() + PIN_LOCK_MS) })
+    return false
+  }
+  return true
+}
 
 async function checkSharePin(setlist, req) {
   if (!setlist.sharePinHash) return 'ok'
-  if (setlist.sharePinLockedUntil && setlist.sharePinLockedUntil > new Date()) return 'locked'
-
   const pin = String(req.headers['x-share-pin'] || '')
-  if (!pin) return 'wrong' // 아직 비밀번호를 넣지 않은 첫 방문은 실패로 세지 않는다
+  if (!pin) return 'wrong' // 아직 비밀번호를 넣지 않은 첫 방문은 시도로 세지 않는다
+
+  const ipKey = `ip:${setlist.shareToken}:${clientIp(req)}`
+  const linkKey = `link:${setlist.shareToken}`
+  if (!(await reserveAttempt(ipKey, PIN_LIMITS.ip))) return 'locked'
+  if (!(await reserveAttempt(linkKey, PIN_LIMITS.link))) return 'locked'
 
   if (await bcrypt.compare(pin, setlist.sharePinHash)) {
-    if (setlist.sharePinFailures) await Setlist.updateOne({ _id: setlist._id }, { sharePinFailures: 0, sharePinLockedUntil: null })
+    // 맞히면 이 기기의 기록은 지우고, 링크 전체 횟수에서는 이번 시도를 되돌린다
+    await PinAttempt.deleteOne({ key: ipKey })
+    await PinAttempt.updateOne({ key: linkKey, attempts: { $gt: 0 } }, { $inc: { attempts: -1 } })
     return 'ok'
   }
-  const failures = (setlist.sharePinFailures || 0) + 1
-  await Setlist.updateOne(
-    { _id: setlist._id },
-    failures >= PIN_MAX_FAILURES
-      ? { sharePinFailures: 0, sharePinLockedUntil: new Date(Date.now() + PIN_LOCK_MS) }
-      : { sharePinFailures: failures }
-  )
-  return failures >= PIN_MAX_FAILURES ? 'locked' : 'wrong'
+  return 'wrong'
 }
 
 function rejectPin(res, result) {
   if (result === 'locked') {
-    return res.status(429).json({ message: '비밀번호를 여러 번 틀려 15분 동안 잠겼습니다. 잠시 후 다시 시도해 주세요', needPin: true, locked: true })
+    return res.status(429).json({ message: '비밀번호를 여러 번 틀려 15분 동안 잠겼습니다. 잠시 후 다시 시도하거나, 공유한 분에게 비밀번호를 새로 걸어 달라고 해 주세요', needPin: true, locked: true })
   }
   return res.status(401).json({ message: '이 콘티는 비밀번호가 필요합니다', needPin: true })
 }
@@ -266,7 +293,7 @@ exports.setPublicCurrentSong = async (req, res) => {
   const { index } = req.body
   if (typeof index !== 'number') return res.status(400).json({ message: 'index required' })
   const token = req.params.token
-  const guarded = await Setlist.findOne({ shareToken: token }, 'sharePinHash sharePinFailures sharePinLockedUntil')
+  const guarded = await Setlist.findOne({ shareToken: token }, 'sharePinHash shareToken')
   if (guarded) {
     const pinResult = await checkSharePin(guarded, req)
     if (pinResult !== 'ok') return rejectPin(res, pinResult)
@@ -360,9 +387,12 @@ exports.setSharePin = async (req, res) => {
       return res.status(400).json({ message: '공유 비밀번호는 숫자 4~8자리로 정해 주세요' })
     }
     setlist.sharePinHash = pin ? await bcrypt.hash(pin, await bcrypt.genSalt(10)) : null
-    setlist.sharePinFailures = 0
-    setlist.sharePinLockedUntil = null
     await setlist.save()
+    // 비밀번호를 새로 걸거나 해제하면 이 링크의 잠금 기록도 모두 지운다
+    if (setlist.shareToken) {
+      await PinAttempt.deleteMany({ key: { $in: [`link:${setlist.shareToken}`] } })
+      await PinAttempt.deleteMany({ key: { $regex: `^ip:${setlist.shareToken}:` } })
+    }
     res.json({ hasSharePin: !!pin })
   } catch (err) {
     res.status(500).json({ message: err.message })
