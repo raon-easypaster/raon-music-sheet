@@ -20,3 +20,9 @@ export function changePasswordRequest(payload) {
     body: JSON.stringify(payload),
   })
 }
+export function checkEmailRequest(email) {
+  return apiFetch('/auth/check-email', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  })
+}

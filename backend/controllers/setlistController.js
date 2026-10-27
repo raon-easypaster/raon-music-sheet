@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs')
 const Setlist = require('../models/Setlist')
 const Song = require('../models/Song')
 const PinAttempt = require('../models/PinAttempt')
+const { clientIp } = require('../utils/rateLimit')
 const { resolveWorkspace, accessFilter, canDelete, FORBIDDEN_WORKSPACE } = require('../utils/access')
 
 // In-memory current song index per share token (resets on server restart)
@@ -190,11 +191,6 @@ const PIN_LOCK_MS = 15 * 60 * 1000
 const PIN_MAX_LOCK_MS = 24 * 60 * 60 * 1000
 const PIN_LIMITS = { ip: 5, link: 30 }
 
-// Vercel은 X-Forwarded-For를 실제 접속 주소로 덮어쓰므로(위조 불가) 이것을 먼저 쓴다.
-// (다른 곳에 배포한다면 그 환경이 이 헤더를 덮어쓰는지 확인해야 한다)
-const clientIp = (req) =>
-  String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.socket?.remoteAddress || '')
-    .split(',')[0].trim()
 
 // 시도 하나를 예약한다 → 'ok' | 'locked'
 // escalate: 링크 전체 기록이면 잠길 때마다 잠금 시간을 늘린다 (최대 24시간)

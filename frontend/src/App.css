@@ -578,3 +578,17 @@ button:hover {
   .print-page:last-child { break-after: auto; page-break-after: auto; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* ===== 로그인: 이메일·비밀번호를 잊었을 때 ===== */
+.link-button { background: none; color: #15803d; padding: 4px 0; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; justify-self: center; }
+.account-help { display: flex; flex-direction: column; gap: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px; font-size: 14px; text-align: left; }
+.account-help p { margin: 0; color: #475569; }
+.account-help-form { display: flex; gap: 8px; }
+.form-card .account-help-form input { margin: 0; flex: 1; min-width: 0; }
+.account-help-form button { padding: 8px 14px; flex: none; }
+.account-help-result { border-radius: 8px; padding: 10px 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.account-help-result.ok { background: #f0fdf4; color: #14532d; }
+.account-help-result.ok .link-button { display: block; margin: 4px 0; }
+.account-help-result.no { background: #fef2f2; color: #991b1b; }
+.account-help-note { font-size: 13px; }
+.account-help > .link-button { align-self: flex-start; }

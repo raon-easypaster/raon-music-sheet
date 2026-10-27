@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const User = require('../models/User')
+const { takeAttempt, clientIp } = require('../utils/rateLimit')
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -11,13 +12,16 @@ const generateToken = (id) => {
 // 이메일은 앞뒤 공백을 지우고 소문자로 맞춘다 (가입·로그인 모두 같은 기준)
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase()
 
+// 길이를 먼저 제한하고(이메일 표준 최대 254자), 겹치지 않는 패턴으로 검사해 느려지는 입력을 막는다
+const isValidEmail = (email) => email.length <= 254 && /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(email)
+const INVALID_EMAIL = '이메일 주소 형식이 올바르지 않습니다 (예: name@gmail.com)'
+
 const validateEmailAndPassword = (email, password) => {
   if (!email || !password) {
     return '이메일과 비밀번호를 입력해 주세요'
   }
-  // 길이를 먼저 제한하고(이메일 표준 최대 254자), 겹치지 않는 패턴으로 검사해 느려지는 입력을 막는다
-  if (email.length > 254 || !/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(email)) {
-    return '이메일 주소 형식이 올바르지 않습니다 (예: name@gmail.com)'
+  if (!isValidEmail(email)) {
+    return INVALID_EMAIL
   }
   if (password.length < 6) {
     return '비밀번호는 6자 이상이어야 합니다'
@@ -119,6 +123,26 @@ exports.login = async (req, res) => {
       mustChangePassword: !!user.mustChangePassword,
       token: generateToken(user._id),
     })
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}
+// POST /auth/check-email  { email } → { registered }
+// 가입한 이메일이 기억나지 않을 때 확인용. 다른 사람의 가입 여부를 마구 알아내지 못하도록
+// 한 기기(IP)에서 15분에 10번까지만 확인할 수 있다
+const EMAIL_CHECK_LIMIT = 10
+const EMAIL_CHECK_WINDOW_MS = 15 * 60 * 1000
+
+exports.checkEmail = async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body.email)
+    if (!email) return res.status(400).json({ message: '확인할 이메일을 입력해 주세요' })
+    if (!isValidEmail(email)) return res.status(400).json({ message: INVALID_EMAIL })
+    if (!(await takeAttempt(`email-check:${clientIp(req)}`, EMAIL_CHECK_LIMIT, EMAIL_CHECK_WINDOW_MS))) {
+      return res.status(429).json({ message: '확인을 너무 많이 했습니다. 15분 뒤 다시 시도하거나 팀장에게 문의해 주세요' })
+    }
+    const registered = !!(await User.exists({ email }))
+    res.json({ email, registered })
   } catch (err) {
     res.status(500).json({ message: err.message })
   }

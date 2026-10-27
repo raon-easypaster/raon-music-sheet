@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../context/useAuth'
+import AccountHelp from './AccountHelp'
 
 export default function LoginForm() {
   const { login, signup, loading } = useAuth()
@@ -83,6 +84,12 @@ export default function LoginForm() {
         </button>
 
         {error ? <p className="error-text">{error}</p> : null}
+
+        {!isSignup && (
+          <AccountHelp
+            onUseEmail={(email) => { setForm((prev) => ({ ...prev, email })); setError('') }}
+          />
+        )}
       </form>
     </div>
   )
