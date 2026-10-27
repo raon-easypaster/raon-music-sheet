@@ -114,6 +114,29 @@ button:hover {
   font-size: 14px;
 }
 
+/* 비밀번호 보기 버튼: 입력칸의 아래 여백은 감싸는 div로 옮겨 버튼이 세로 가운데에 오게 한다 */
+.password-field {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.form-card .password-field input {
+  margin-bottom: 0;
+  padding-right: 72px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #e5e7eb;
+  color: #111827;
+  font-size: 13px;
+}
+
 .form-card h2 {
   margin-top: 0;
 }

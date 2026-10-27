@@ -6,6 +6,7 @@ export default function LoginForm() {
   const [isSignup, setIsSignup] = useState(false)
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   function handleChange(e) {
     const { name, value } = e.target
@@ -41,14 +42,26 @@ export default function LoginForm() {
           required
         />
 
-        <input
-          type="password"
-          name="password"
-          placeholder="비밀번호 (6자 이상)"
-          value={form.password}
-          onChange={handleChange}
-          required
-        />
+        <div className="password-field">
+          <input
+            type={showPassword ? 'text' : 'password'}
+            name="password"
+            placeholder="비밀번호 (6자 이상)"
+            value={form.password}
+            onChange={handleChange}
+            autoComplete={isSignup ? 'new-password' : 'current-password'}
+            required
+          />
+          <button
+            type="button"
+            className="password-toggle"
+            onClick={() => setShowPassword((v) => !v)}
+            aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'}
+            aria-pressed={showPassword}
+          >
+            {showPassword ? '숨기기' : '보기'}
+          </button>
+        </div>
 
         <button type="submit" disabled={loading}>
           {loading ? '처리 중...' : (isSignup ? '회원가입' : '로그인')}
