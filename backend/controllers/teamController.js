@@ -6,6 +6,8 @@ const bcrypt = require('bcryptjs')
 const mongoose = require('mongoose')
 const { generateTempPassword } = require('../utils/tempPassword')
 
+const TEMP_PASSWORD_TTL_MS = 24 * 60 * 60 * 1000
+
 exports.createTeam = async (req, res) => {
   try {
     const { name } = req.body
@@ -138,6 +140,7 @@ exports.resetMemberPassword = async (req, res) => {
     const tempPassword = generateTempPassword()
     member.password = await bcrypt.hash(tempPassword, await bcrypt.genSalt(10))
     member.mustChangePassword = true
+    member.tempPasswordExpiresAt = new Date(Date.now() + TEMP_PASSWORD_TTL_MS)
     await member.save()
 
     res.json({ email: member.email, tempPassword })

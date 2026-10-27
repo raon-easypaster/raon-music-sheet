@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useAuth } from '../context/useAuth'
-import { getSongs, createSong, deleteSong, updateSong } from '../api/songs'
+import { getSongs, createSong, deleteSong, updateSong, setFavorite } from '../api/songs'
 import {
   getSetlists,
   createSetlist,
@@ -59,7 +59,10 @@ export default function Dashboard() {
     }
   }, [])
 
-  useEffect(() => { loadTeams() }, [loadTeams])
+  // 임시 비밀번호로 들어온 계정은 비밀번호를 바꾸기 전까지 서버가 다른 요청을 막으므로 불러오지 않는다
+  const mustChangePassword = !!user?.mustChangePassword
+
+  useEffect(() => { if (!mustChangePassword) loadTeams() }, [loadTeams, mustChangePassword])
 
   useEffect(() => {
     try { localStorage.setItem(WORKSPACE_KEY, workspace) } catch { /* 저장 실패해도 동작에는 지장 없음 */ }
@@ -95,7 +98,7 @@ export default function Dashboard() {
     }
   }, [selectedSetlistId, workspace])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => { if (!mustChangePassword) loadData() }, [loadData, mustChangePassword])
 
   async function handleCreateSong(payload) { await createSong({ ...payload, team: workspace || null }); await loadData() }
   async function handleCreateSetlist(payload) { await createSetlist({ ...payload, team: workspace || null }); await loadData() }
@@ -109,6 +112,18 @@ export default function Dashboard() {
   }
   async function handleUpdateSong(id, payload) { await updateSong(id, payload); await loadData() }
   async function handleReorder(setlistId, songIds) { await reorderSetlist(setlistId, songIds); await loadData() }
+  // 별을 누르면 화면에 바로 반영하고, 저장에 실패하면 되돌린다
+  async function handleToggleFavorite(songId, favorite) {
+    const apply = (value) => setSongs((prev) => prev.map((s) => (s._id === songId ? { ...s, isFavorite: value } : s)))
+    apply(favorite)
+    try {
+      await setFavorite(songId, favorite)
+    } catch (err) {
+      apply(!favorite)
+      setError(err.message)
+    }
+  }
+
   async function handleShare(setlistId) { return generateShareToken(setlistId) }
 
   async function handleChangePassword(e) {
@@ -127,7 +142,7 @@ export default function Dashboard() {
       setPwMsg(res.message)
       setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
       markPasswordChanged()
-      setTimeout(() => setShowPwModal(false), 1500)
+      setTimeout(() => setShowPwModal(false), mustChangePassword ? 0 : 1500)
     } catch (err) {
       setPwMsg(err.message)
     } finally {
@@ -152,7 +167,7 @@ export default function Dashboard() {
       </header>
 
       {showPwModal && (
-        <div className="modal-overlay" onClick={() => setShowPwModal(false)}>
+        <div className="modal-overlay" onClick={() => { if (!mustChangePassword) setShowPwModal(false) }}>
           <div className="modal-box" onClick={e => e.stopPropagation()}>
             <h2>비밀번호 변경</h2>
             {user?.mustChangePassword && (
@@ -188,7 +203,9 @@ export default function Dashboard() {
               />
               {pwMsg && <p style={{ color: pwMsg.includes('변경되었') ? 'green' : 'red', margin: 0 }}>{pwMsg}</p>}
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                <button type="button" className="secondary" onClick={() => setShowPwModal(false)}>취소</button>
+                {mustChangePassword
+                  ? <button type="button" className="secondary" onClick={logout}>로그아웃</button>
+                  : <button type="button" className="secondary" onClick={() => setShowPwModal(false)}>취소</button>}
                 <button type="submit" disabled={pwLoading}>{pwLoading ? '변경 중...' : '변경'}</button>
               </div>
             </form>
@@ -236,7 +253,14 @@ export default function Dashboard() {
           {tab === 0 && (
             <>
               <SongForm onCreate={handleCreateSong} />
-              <SongList songs={songs} showOwner={!!currentTeam} onDelete={handleDeleteSong} onUpdate={handleUpdateSong} />
+              <SongList
+                songs={songs}
+                showOwner={!!currentTeam}
+                canDelete={!currentTeam || currentTeam.owner?._id === user?._id}
+                onDelete={handleDeleteSong}
+                onUpdate={handleUpdateSong}
+                onToggleFavorite={handleToggleFavorite}
+              />
             </>
           )}
 
@@ -254,6 +278,7 @@ export default function Dashboard() {
                   setlist={selectedSetlist}
                   songs={songs}
                   onAddSongs={handleAddSongs}
+                  onToggleFavorite={handleToggleFavorite}
                   onRemoveSong={handleRemoveSong}
                   onReorder={handleReorder}
                   onShare={handleShare}

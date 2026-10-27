@@ -18,6 +18,14 @@ exports.protect = async (req, res, next) => {
       }
 
       req.user = user;
+
+      if (user.mustChangePassword && !req.originalUrl.startsWith("/api/auth/change-password")) {
+        return res.status(403).json({
+          message: "비밀번호를 먼저 변경해 주세요",
+          code: "MUST_CHANGE_PASSWORD",
+        });
+      }
+
       return next();
     } catch (err) {
       return res.status(401).json({ message: "Not authorized" });

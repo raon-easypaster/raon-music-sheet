@@ -18,6 +18,18 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // 각자 따로 표시하는 즐겨찾기 곡 (다른 사람에게는 보이지 않는다)
+    favoriteSongs: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Song',
+      },
+    ],
+    // 임시 비밀번호의 유효 기한 (지나면 그 임시 비밀번호로는 로그인할 수 없다)
+    tempPasswordExpiresAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 )

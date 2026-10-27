@@ -62,6 +62,9 @@ exports.changePassword = async (req, res) => {
     if (newPassword.length < 6) {
       return res.status(400).json({ message: '비밀번호는 6자 이상이어야 합니다' })
     }
+    if (newPassword === currentPassword) {
+      return res.status(400).json({ message: '새 비밀번호는 지금 비밀번호와 달라야 합니다' })
+    }
     const user = await User.findById(req.user._id)
     const isMatch = await bcrypt.compare(currentPassword, user.password)
     if (!isMatch) {
@@ -70,6 +73,7 @@ exports.changePassword = async (req, res) => {
     const salt = await bcrypt.genSalt(10)
     user.password = await bcrypt.hash(newPassword, salt)
     user.mustChangePassword = false
+    user.tempPasswordExpiresAt = null
     await user.save()
     res.json({ message: '비밀번호가 변경되었습니다' })
   } catch (err) {
@@ -95,6 +99,10 @@ exports.login = async (req, res) => {
 
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid credentials' })
+    }
+
+    if (user.mustChangePassword && user.tempPasswordExpiresAt && user.tempPasswordExpiresAt < new Date()) {
+      return res.status(400).json({ message: '임시 비밀번호가 만료되었습니다. 팀장에게 다시 초기화를 요청해 주세요' })
     }
 
     res.json({

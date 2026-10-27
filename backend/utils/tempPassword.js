@@ -9,5 +9,5 @@ function randomChars(n) {
   return out
 }
 
-// 예: raon-7kq3-m9xp
-exports.generateTempPassword = () => `raon-${randomChars(4)}-${randomChars(4)}`
+// 예: raon-7kq3-m9xp-h4tw (4자 3묶음 ≈ 59비트 — 받아 적기 쉬우면서 추측으로 맞히기 어렵게)
+exports.generateTempPassword = () => `raon-${randomChars(4)}-${randomChars(4)}-${randomChars(4)}`
