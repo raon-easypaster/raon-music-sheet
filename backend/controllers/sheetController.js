@@ -8,8 +8,9 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const FILE_ID = /^[A-Za-z0-9_-]{20,100}$/
 
 function driveConfig() {
-  const url = process.env.DRIVE_UPLOAD_URL
-  const secret = process.env.DRIVE_UPLOAD_SECRET
+  // 복사·붙여넣기 때 딸려 온 앞뒤 공백·줄바꿈은 무시한다
+  const url = (process.env.DRIVE_UPLOAD_URL || '').trim()
+  const secret = (process.env.DRIVE_UPLOAD_SECRET || '').trim()
   return url && secret ? { url, secret } : null
 }
 
