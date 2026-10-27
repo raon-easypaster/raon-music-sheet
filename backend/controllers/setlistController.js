@@ -180,24 +180,24 @@ exports.getShareToken = async (req, res) => {
 }
 
 // PUBLIC VIEW BY TOKEN (no auth)
-// 공유 비밀번호가 걸린 콘티는 x-share-pin 헤더가 맞아야 한다 → 'ok' | 'wrong' | 'locked' | 'blocked'
+// 공유 비밀번호가 걸린 콘티는 x-share-pin 헤더가 맞아야 한다 → 'ok' | 'wrong' | 'locked'
 // - 기기(IP)마다 5번 틀리면 그 기기만 15분 잠금 (다른 팀원은 영향 없음)
-// - 여러 기기에서 합쳐 30번 틀리면 링크 전체 잠금. 잠길 때마다 시간이 두 배(15분→30분→1시간…최대 24시간)가 되고,
-//   4번째에는 팀원이 비밀번호를 새로 걸 때까지 잠근다 (IP를 바꿔 가며 맞히기 방지)
+// - 여러 기기에서 합쳐 30번 틀리면 링크 전체 잠금. 잠길 때마다 시간이 두 배(15분→30분→1시간…최대 24시간)가 된다.
+//   새 비밀번호는 6자리 이상이라 하루 30번으로는 맞히는 데 수십 년이 걸리므로, 무기한 잠금은 두지 않는다
+//   (누군가 일부러 틀려도 팀이 영영 못 쓰게 되지 않도록)
 // - 시도는 비밀번호를 확인하기 "전에" 원자적으로 하나씩 예약하므로, 동시에 많이 보내도 한도를 넘지 못한다
 const PIN_LOCK_MS = 15 * 60 * 1000
 const PIN_MAX_LOCK_MS = 24 * 60 * 60 * 1000
 const PIN_LIMITS = { ip: 5, link: 30 }
-const LINK_BLOCK_AFTER = 4
-const FOREVER = new Date('9999-12-31T00:00:00Z')
 
-// Vercel은 X-Forwarded-For를 실제 접속 주소로 덮어쓰므로(위조 불가) 이것을 먼저 쓴다
+// Vercel은 X-Forwarded-For를 실제 접속 주소로 덮어쓰므로(위조 불가) 이것을 먼저 쓴다.
+// (다른 곳에 배포한다면 그 환경이 이 헤더를 덮어쓰는지 확인해야 한다)
 const clientIp = (req) =>
   String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.socket?.remoteAddress || '')
     .split(',')[0].trim()
 
-// 시도 하나를 예약한다 → 'ok' | 'locked' | 'blocked'(비밀번호를 새로 걸 때까지)
-// escalate: 링크 전체 기록이면 잠길 때마다 시간을 늘리고, 여러 번이면 무기한 잠근다
+// 시도 하나를 예약한다 → 'ok' | 'locked'
+// escalate: 링크 전체 기록이면 잠길 때마다 잠금 시간을 늘린다 (최대 24시간)
 async function reserveAttempt(key, limit, escalate = false) {
   const now = new Date()
   // 링크 기록은 잠금 이력을 기억해야 하므로 오래 보관한다
@@ -211,19 +211,14 @@ async function reserveAttempt(key, limit, escalate = false) {
     )
   } catch (err) {
     if (err.code !== 11000) throw err // 11000 = 잠긴 문서가 있어 새로 만들 수 없음 = 잠김
-    const locked = await PinAttempt.findOne({ key }, 'lockedUntil')
-    return locked?.lockedUntil >= FOREVER ? 'blocked' : 'locked'
+    return 'locked'
   }
   if (doc.attempts <= limit) return 'ok'
 
   const lockCount = (doc.lockCount || 0) + 1
-  const blocked = escalate && lockCount >= LINK_BLOCK_AFTER
   const lockMs = escalate ? Math.min(PIN_LOCK_MS * 2 ** (lockCount - 1), PIN_MAX_LOCK_MS) : PIN_LOCK_MS
-  await PinAttempt.updateOne(
-    { key },
-    { attempts: 0, lockCount, lockedUntil: blocked ? FOREVER : new Date(now.getTime() + lockMs), expireAt: blocked ? FOREVER : keepUntil }
-  )
-  return blocked ? 'blocked' : 'locked'
+  await PinAttempt.updateOne({ key }, { attempts: 0, lockCount, lockedUntil: new Date(now.getTime() + lockMs), expireAt: keepUntil })
+  return 'locked'
 }
 
 async function checkSharePin(setlist, req) {
@@ -248,9 +243,6 @@ async function checkSharePin(setlist, req) {
 }
 
 function rejectPin(res, result) {
-  if (result === 'blocked') {
-    return res.status(429).json({ message: '비밀번호 시도가 너무 많아 이 링크를 잠갔습니다. 공유한 분이 비밀번호를 새로 걸어야 다시 열립니다', needPin: true, locked: true })
-  }
   if (result === 'locked') {
     return res.status(429).json({ message: '비밀번호를 여러 번 틀려 15분 동안 잠겼습니다. 잠시 후 다시 시도하거나, 공유한 분에게 비밀번호를 새로 걸어 달라고 해 주세요', needPin: true, locked: true })
   }
