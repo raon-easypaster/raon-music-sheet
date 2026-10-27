@@ -8,38 +8,45 @@ const generateToken = (id) => {
   })
 }
 
+// 이메일은 앞뒤 공백을 지우고 소문자로 맞춘다 (가입·로그인 모두 같은 기준)
+const normalizeEmail = (email) => String(email || '').trim().toLowerCase()
+
 const validateEmailAndPassword = (email, password) => {
   if (!email || !password) {
-    return 'Email and password are required'
+    return '이메일과 비밀번호를 입력해 주세요'
   }
-
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return '이메일 주소 형식이 올바르지 않습니다 (예: name@gmail.com)'
+  }
   if (password.length < 6) {
-    return 'Password must be at least 6 characters'
+    return '비밀번호는 6자 이상이어야 합니다'
   }
-
   return null
 }
 
 exports.signup = async (req, res) => {
   try {
-    const { email, password } = req.body
+    const email = normalizeEmail(req.body.email)
+    const { password } = req.body
 
     const validationError = validateEmailAndPassword(email, password)
     if (validationError) {
       return res.status(400).json({ message: validationError })
     }
 
-    const existingUser = await User.findOne({ email: email.toLowerCase() })
+    const existingUser = await User.findOne({ email })
 
     if (existingUser) {
-      return res.status(400).json({ message: 'User already exists' })
+      return res.status(400).json({
+        message: '이미 가입된 이메일입니다. 아래 "이미 계정이 있어요 → 로그인"으로 로그인해 주세요. 비밀번호를 잊었다면 팀장에게 비밀번호 초기화를 요청하세요',
+      })
     }
 
     const salt = await bcrypt.genSalt(10)
     const hashedPassword = await bcrypt.hash(password, salt)
 
     const user = await User.create({
-      email: email.toLowerCase(),
+      email,
       password: hashedPassword,
     })
 
@@ -86,19 +93,19 @@ exports.login = async (req, res) => {
     const { email, password } = req.body
 
     if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required' })
+      return res.status(400).json({ message: '이메일과 비밀번호를 입력해 주세요' })
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() })
+    const user = await User.findOne({ email: normalizeEmail(email) })
 
     if (!user) {
-      return res.status(400).json({ message: 'Invalid credentials' })
+      return res.status(400).json({ message: '이메일 또는 비밀번호가 맞지 않습니다. 처음 오셨다면 아래 "회원가입"을 먼저 해 주세요' })
     }
 
     const isMatch = await bcrypt.compare(password, user.password)
 
     if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid credentials' })
+      return res.status(400).json({ message: '이메일 또는 비밀번호가 맞지 않습니다. 처음 오셨다면 아래 "회원가입"을 먼저 해 주세요' })
     }
 
     if (user.mustChangePassword && user.tempPasswordExpiresAt && user.tempPasswordExpiresAt < new Date()) {
