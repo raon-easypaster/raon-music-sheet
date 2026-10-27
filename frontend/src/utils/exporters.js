@@ -13,9 +13,11 @@ function download(filename, content, type) {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
+// 엑셀이 = + - @ 로 시작하는 칸을 수식으로 실행하지 않도록 앞에 ' 를 붙인다
 const csvCell = (v) => {
-  const s = v == null ? '' : String(v)
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  let s = v == null ? '' : String(v)
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`
+  return /[",\n\r']/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
 const SONG_COLUMNS = [

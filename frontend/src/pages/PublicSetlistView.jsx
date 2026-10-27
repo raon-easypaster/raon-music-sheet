@@ -36,13 +36,16 @@ export default function PublicSetlistView() {
       .catch(err => {
         if (err.data?.needPin) {
           setNeedPin(true)
-          if (pin) setPinError('비밀번호가 맞지 않습니다')
+          if (err.data.locked) setPinError(err.message)
+          else if (pin) setPinError('비밀번호가 맞지 않습니다')
+          // 틀린 비밀번호를 기억해 두면 새로고침할 때마다 다시 틀린 것으로 세므로 지운다
+          if (pin) { try { sessionStorage.removeItem(pinKey) } catch { /* 무시 */ } }
         } else {
           setError(err.message || '유효하지 않은 링크입니다')
         }
       })
       .finally(() => setLoading(false))
-  }, [token, pin])
+  }, [token, pin, pinKey])
 
   function submitPin(e) {
     e.preventDefault()

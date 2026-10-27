@@ -179,20 +179,45 @@ exports.getShareToken = async (req, res) => {
 }
 
 // PUBLIC VIEW BY TOKEN (no auth)
-// 공유 비밀번호가 걸린 콘티는 x-share-pin 헤더가 맞아야 한다
+// 공유 비밀번호가 걸린 콘티는 x-share-pin 헤더가 맞아야 한다.
+// 5번 틀리면 15분 동안 잠근다 → 'ok' | 'wrong' | 'locked'
+const PIN_MAX_FAILURES = 5
+const PIN_LOCK_MS = 15 * 60 * 1000
+
 async function checkSharePin(setlist, req) {
-  if (!setlist.sharePinHash) return true
+  if (!setlist.sharePinHash) return 'ok'
+  if (setlist.sharePinLockedUntil && setlist.sharePinLockedUntil > new Date()) return 'locked'
+
   const pin = String(req.headers['x-share-pin'] || '')
-  return !!pin && bcrypt.compare(pin, setlist.sharePinHash)
+  if (!pin) return 'wrong' // 아직 비밀번호를 넣지 않은 첫 방문은 실패로 세지 않는다
+
+  if (await bcrypt.compare(pin, setlist.sharePinHash)) {
+    if (setlist.sharePinFailures) await Setlist.updateOne({ _id: setlist._id }, { sharePinFailures: 0, sharePinLockedUntil: null })
+    return 'ok'
+  }
+  const failures = (setlist.sharePinFailures || 0) + 1
+  await Setlist.updateOne(
+    { _id: setlist._id },
+    failures >= PIN_MAX_FAILURES
+      ? { sharePinFailures: 0, sharePinLockedUntil: new Date(Date.now() + PIN_LOCK_MS) }
+      : { sharePinFailures: failures }
+  )
+  return failures >= PIN_MAX_FAILURES ? 'locked' : 'wrong'
+}
+
+function rejectPin(res, result) {
+  if (result === 'locked') {
+    return res.status(429).json({ message: '비밀번호를 여러 번 틀려 15분 동안 잠겼습니다. 잠시 후 다시 시도해 주세요', needPin: true, locked: true })
+  }
+  return res.status(401).json({ message: '이 콘티는 비밀번호가 필요합니다', needPin: true })
 }
 
 exports.getPublicSetlist = async (req, res) => {
   try {
     const setlist = await Setlist.findOne({ shareToken: req.params.token }).populate('songs')
     if (!setlist) return res.status(404).json({ message: '유효하지 않은 링크입니다' })
-    if (!(await checkSharePin(setlist, req))) {
-      return res.status(401).json({ message: '이 콘티는 비밀번호가 필요합니다', needPin: true })
-    }
+    const pinResult = await checkSharePin(setlist, req)
+    if (pinResult !== 'ok') return rejectPin(res, pinResult)
 
     const settings = new Map((setlist.songSettings || []).map((s) => [s.song.toString(), s]))
     res.json({
@@ -241,9 +266,10 @@ exports.setPublicCurrentSong = async (req, res) => {
   const { index } = req.body
   if (typeof index !== 'number') return res.status(400).json({ message: 'index required' })
   const token = req.params.token
-  const locked = await Setlist.findOne({ shareToken: token }, 'sharePinHash')
-  if (locked && !(await checkSharePin(locked, req))) {
-    return res.status(401).json({ message: '이 콘티는 비밀번호가 필요합니다', needPin: true })
+  const guarded = await Setlist.findOne({ shareToken: token }, 'sharePinHash sharePinFailures sharePinLockedUntil')
+  if (guarded) {
+    const pinResult = await checkSharePin(guarded, req)
+    if (pinResult !== 'ok') return rejectPin(res, pinResult)
   }
   currentSongMap.set(token, index)
   Setlist.updateOne({ shareToken: token }, { currentSongIdx: index }).catch(() => {})
@@ -334,6 +360,8 @@ exports.setSharePin = async (req, res) => {
       return res.status(400).json({ message: '공유 비밀번호는 숫자 4~8자리로 정해 주세요' })
     }
     setlist.sharePinHash = pin ? await bcrypt.hash(pin, await bcrypt.genSalt(10)) : null
+    setlist.sharePinFailures = 0
+    setlist.sharePinLockedUntil = null
     await setlist.save()
     res.json({ hasSharePin: !!pin })
   } catch (err) {
