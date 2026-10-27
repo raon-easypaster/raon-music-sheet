@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useAuth } from '../context/useAuth'
 import { getSongs, createSong, deleteSong, updateSong } from '../api/songs'
 import {
@@ -29,7 +29,7 @@ function loadSavedWorkspace() {
 }
 
 export default function Dashboard() {
-  const { logout, user } = useAuth()
+  const { logout, user, markPasswordChanged } = useAuth()
 
   // 작업 공간: '' = 내 개인 공간, 그 외 = 팀 id
   const [teams, setTeams] = useState([])
@@ -41,7 +41,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tab, setTab] = useState(0)
-  const [showPwModal, setShowPwModal] = useState(false)
+  // 팀장이 임시 비밀번호로 초기화한 계정은 로그인하자마자 비밀번호 변경 창을 띄운다
+  const [showPwModal, setShowPwModal] = useState(() => !!user?.mustChangePassword)
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
   const [pwMsg, setPwMsg] = useState('')
   const [pwLoading, setPwLoading] = useState(false)
@@ -64,12 +65,17 @@ export default function Dashboard() {
     try { localStorage.setItem(WORKSPACE_KEY, workspace) } catch { /* 저장 실패해도 동작에는 지장 없음 */ }
   }, [workspace])
 
+  // 작업 공간을 빠르게 바꾸면 이전 요청의 응답이 늦게 도착할 수 있다 → 가장 최근 요청의 결과만 반영한다
+  const latestLoad = useRef(0)
+
   const loadData = useCallback(async () => {
+    const loadId = ++latestLoad.current
     setLoading(true)
     setError('')
     try {
       const team = workspace || undefined
       const [songsData, setlistsData] = await Promise.all([getSongs(team), getSetlists(team)])
+      if (loadId !== latestLoad.current) return
       const songsArray = Array.isArray(songsData) ? songsData : songsData.songs || []
       const setlistsArray = Array.isArray(setlistsData) ? setlistsData : setlistsData.setlists || []
 
@@ -83,9 +89,9 @@ export default function Dashboard() {
         setSelectedSetlistId(null)
       }
     } catch (err) {
-      setError(err.message || '데이터를 불러오지 못했습니다')
+      if (loadId === latestLoad.current) setError(err.message || '데이터를 불러오지 못했습니다')
     } finally {
-      setLoading(false)
+      if (loadId === latestLoad.current) setLoading(false)
     }
   }, [selectedSetlistId, workspace])
 
@@ -120,6 +126,7 @@ export default function Dashboard() {
       })
       setPwMsg(res.message)
       setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      markPasswordChanged()
       setTimeout(() => setShowPwModal(false), 1500)
     } catch (err) {
       setPwMsg(err.message)
@@ -148,9 +155,16 @@ export default function Dashboard() {
         <div className="modal-overlay" onClick={() => setShowPwModal(false)}>
           <div className="modal-box" onClick={e => e.stopPropagation()}>
             <h2>비밀번호 변경</h2>
+            {user?.mustChangePassword && (
+              <p className="notice-text">
+                팀장이 임시 비밀번호로 초기화한 계정입니다. 현재 비밀번호 칸에 받은 임시 비밀번호를 넣고,
+                앞으로 쓸 새 비밀번호로 바꿔 주세요.
+              </p>
+            )}
             <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <input
                 type="password"
+                autoComplete="current-password"
                 placeholder="현재 비밀번호"
                 value={pwForm.currentPassword}
                 onChange={e => setPwForm(f => ({ ...f, currentPassword: e.target.value }))}
@@ -158,6 +172,7 @@ export default function Dashboard() {
               />
               <input
                 type="password"
+                autoComplete="new-password"
                 placeholder="새 비밀번호 (6자 이상)"
                 value={pwForm.newPassword}
                 onChange={e => setPwForm(f => ({ ...f, newPassword: e.target.value }))}
@@ -165,6 +180,7 @@ export default function Dashboard() {
               />
               <input
                 type="password"
+                autoComplete="new-password"
                 placeholder="새 비밀번호 확인"
                 value={pwForm.confirmPassword}
                 onChange={e => setPwForm(f => ({ ...f, confirmPassword: e.target.value }))}

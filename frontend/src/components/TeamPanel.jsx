@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getMyTeams, createTeam, joinTeam, leaveTeam, deleteTeam, moveMyItemsToTeam } from '../api/teams'
+import { getMyTeams, createTeam, joinTeam, leaveTeam, deleteTeam, moveMyItemsToTeam, resetMemberPassword } from '../api/teams'
 
 export default function TeamPanel({ currentUserId, onTeamsChanged, onItemsMoved }) {
   const [teams, setTeams] = useState([])
@@ -9,6 +9,8 @@ export default function TeamPanel({ currentUserId, onTeamsChanged, onItemsMoved 
   const [submitting, setSubmitting] = useState(false)
   const [copied, setCopied] = useState(null)
   const [notice, setNotice] = useState('')
+  // 방금 초기화한 팀원의 임시 비밀번호 (화면에 한 번만 보여 준다)
+  const [resetResult, setResetResult] = useState(null)
 
   async function load() {
     try {
@@ -90,6 +92,21 @@ export default function TeamPanel({ currentUserId, onTeamsChanged, onItemsMoved 
       const res = await moveMyItemsToTeam(team._id)
       setNotice(res.message)
       onItemsMoved?.(team._id)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleResetPassword(team, member) {
+    if (!window.confirm(`${member.email} 님의 비밀번호를 임시 비밀번호로 초기화할까요?\n지금 쓰던 비밀번호로는 더 이상 로그인할 수 없습니다.`)) return
+    setSubmitting(true)
+    setError('')
+    setResetResult(null)
+    try {
+      const res = await resetMemberPassword(team._id, member._id)
+      setResetResult({ teamId: team._id, email: res.email, tempPassword: res.tempPassword })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -185,6 +202,35 @@ export default function TeamPanel({ currentUserId, onTeamsChanged, onItemsMoved 
                   </button>
                 )}
               </div>
+
+              {team.owner?._id === currentUserId && (
+                <div className="member-list">
+                  <span className="muted" style={{ fontSize: 13 }}>팀원</span>
+                  {team.members?.map((m) => (
+                    <div key={m._id} className="member-row">
+                      <span>{m.email}{m._id === currentUserId ? ' (나)' : ''}</span>
+                      {m._id !== currentUserId && (
+                        <button
+                          className="secondary"
+                          onClick={() => handleResetPassword(team, m)}
+                          disabled={submitting}
+                        >
+                          비밀번호 초기화
+                        </button>
+                      )}
+                    </div>
+                  ))}
+
+                  {resetResult?.teamId === team._id && (
+                    <div className="notice-text">
+                      <strong>{resetResult.email}</strong> 님의 임시 비밀번호:
+                      <div className="temp-password">{resetResult.tempPassword}</div>
+                      이 비밀번호를 팀원에게 직접 알려 주세요. 이 창을 벗어나면 다시 볼 수 없습니다.
+                      팀원이 로그인하면 새 비밀번호로 바꾸는 창이 바로 열립니다.
+                    </div>
+                  )}
+                </div>
+              )}
             </li>
           ))}
         </ul>

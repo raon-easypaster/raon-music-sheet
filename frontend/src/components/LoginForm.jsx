@@ -36,6 +36,9 @@ export default function LoginForm() {
         <input
           type="email"
           name="email"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           placeholder="이메일"
           value={form.email}
           onChange={handleChange}
@@ -50,6 +53,9 @@ export default function LoginForm() {
             value={form.password}
             onChange={handleChange}
             autoComplete={isSignup ? 'new-password' : 'current-password'}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             required
           />
           <button

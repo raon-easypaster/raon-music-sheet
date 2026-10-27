@@ -1,6 +1,10 @@
 const Team = require('../models/Team')
 const Song = require('../models/Song')
 const Setlist = require('../models/Setlist')
+const User = require('../models/User')
+const bcrypt = require('bcryptjs')
+const mongoose = require('mongoose')
+const { generateTempPassword } = require('../utils/tempPassword')
 
 exports.createTeam = async (req, res) => {
   try {
@@ -105,6 +109,38 @@ exports.moveMyItemsToTeam = async (req, res) => {
       setlists: setlists.modifiedCount,
       message: `곡 ${songs.modifiedCount}개, 콘티 ${setlists.modifiedCount}개를 '${team.name}' 팀으로 옮겼습니다`,
     })
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}
+
+// 팀장이 팀원의 비밀번호를 임시 비밀번호로 초기화한다. 임시 비밀번호는 이 응답에서 한 번만 보여 준다
+exports.resetMemberPassword = async (req, res) => {
+  try {
+    const { id, userId } = req.params
+    if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: '잘못된 요청입니다' })
+    }
+
+    const team = await Team.findOne({ _id: id, owner: req.user._id })
+    if (!team) return res.status(403).json({ message: '팀장만 팀원 비밀번호를 초기화할 수 있습니다' })
+
+    if (userId === req.user._id.toString()) {
+      return res.status(400).json({ message: '내 비밀번호는 비밀번호 변경에서 바꿔 주세요' })
+    }
+    if (!team.members.some((m) => m.toString() === userId)) {
+      return res.status(404).json({ message: '이 팀의 팀원이 아닙니다' })
+    }
+
+    const member = await User.findById(userId)
+    if (!member) return res.status(404).json({ message: '팀원을 찾을 수 없습니다' })
+
+    const tempPassword = generateTempPassword()
+    member.password = await bcrypt.hash(tempPassword, await bcrypt.genSalt(10))
+    member.mustChangePassword = true
+    await member.save()
+
+    res.json({ email: member.email, tempPassword })
   } catch (err) {
     res.status(500).json({ message: err.message })
   }

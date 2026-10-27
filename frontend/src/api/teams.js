@@ -22,6 +22,10 @@ export function moveMyItemsToTeam(id) {
   return apiFetch(`/teams/${id}/move-my-items`, { method: 'POST' })
 }
 
+export function resetMemberPassword(teamId, userId) {
+  return apiFetch(`/teams/${teamId}/members/${userId}/reset-password`, { method: 'POST' })
+}
+
 export function leaveTeam(id) {
   return apiFetch(`/teams/${id}/leave`, { method: 'DELETE' })
 }

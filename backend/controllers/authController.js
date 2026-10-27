@@ -69,6 +69,7 @@ exports.changePassword = async (req, res) => {
     }
     const salt = await bcrypt.genSalt(10)
     user.password = await bcrypt.hash(newPassword, salt)
+    user.mustChangePassword = false
     await user.save()
     res.json({ message: '비밀번호가 변경되었습니다' })
   } catch (err) {
@@ -99,6 +100,7 @@ exports.login = async (req, res) => {
     res.json({
       _id: user._id,
       email: user.email,
+      mustChangePassword: !!user.mustChangePassword,
       token: generateToken(user._id),
     })
   } catch (err) {

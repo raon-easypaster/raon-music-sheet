@@ -24,7 +24,7 @@ export function AuthProvider({ children }) {
     setLoading(true)
     try {
       const data = await loginRequest({ email, password })
-      persist(data.token, data.user || { email: data.email, _id: data._id })
+      persist(data.token, data.user || { email: data.email, _id: data._id, mustChangePassword: !!data.mustChangePassword })
       return data
     } finally {
       setLoading(false)
@@ -46,6 +46,10 @@ export function AuthProvider({ children }) {
     persist(null, null)
   }
 
+  function markPasswordChanged() {
+    persist(token, user ? { ...user, mustChangePassword: false } : user)
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -55,6 +59,7 @@ export function AuthProvider({ children }) {
         login,
         signup,
         logout,
+        markPasswordChanged,
         isAuthenticated: Boolean(token),
       }}
     >
