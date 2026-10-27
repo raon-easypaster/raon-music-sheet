@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const User = require('../models/User')
-const { takeAttempt, clientIp } = require('../utils/rateLimit')
+const { takeAttempt, refundAttempt, clientIp } = require('../utils/rateLimit')
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -93,12 +93,21 @@ exports.changePassword = async (req, res) => {
   }
 }
 
+const LOGIN_FAIL_LIMIT = 20
+const LOGIN_WINDOW_MS = 15 * 60 * 1000
+
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body
 
     if (!email || !password) {
       return res.status(400).json({ message: '이메일과 비밀번호를 입력해 주세요' })
+    }
+
+    // 비밀번호를 마구 넣어 보지 못하도록 한 기기에서 15분에 20번까지만 틀릴 수 있다 (성공한 로그인은 세지 않음)
+    const loginKey = `login:${clientIp(req)}`
+    if (!(await takeAttempt(loginKey, LOGIN_FAIL_LIMIT, LOGIN_WINDOW_MS))) {
+      return res.status(429).json({ message: '로그인을 너무 많이 실패했습니다. 15분 뒤 다시 시도하거나 팀장에게 비밀번호 초기화를 요청해 주세요' })
     }
 
     const user = await User.findOne({ email: normalizeEmail(email) })
@@ -112,6 +121,8 @@ exports.login = async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ message: '이메일 또는 비밀번호가 맞지 않습니다. 처음 오셨다면 아래 "회원가입"을 먼저 해 주세요' })
     }
+
+    await refundAttempt(loginKey)
 
     if (user.mustChangePassword && user.tempPasswordExpiresAt && user.tempPasswordExpiresAt < new Date()) {
       return res.status(400).json({ message: '임시 비밀번호가 만료되었습니다. 팀장에게 다시 초기화를 요청해 주세요' })
@@ -132,6 +143,9 @@ exports.login = async (req, res) => {
 // 한 기기(IP)에서 15분에 10번까지만 확인할 수 있다
 const EMAIL_CHECK_LIMIT = 10
 const EMAIL_CHECK_WINDOW_MS = 15 * 60 * 1000
+// 기기(IP)를 바꿔 가며 대량으로 확인하지 못하도록 사이트 전체로도 1시간에 100번까지만
+const EMAIL_CHECK_GLOBAL_LIMIT = 100
+const EMAIL_CHECK_GLOBAL_WINDOW_MS = 60 * 60 * 1000
 
 exports.checkEmail = async (req, res) => {
   try {
@@ -140,6 +154,9 @@ exports.checkEmail = async (req, res) => {
     if (!isValidEmail(email)) return res.status(400).json({ message: INVALID_EMAIL })
     if (!(await takeAttempt(`email-check:${clientIp(req)}`, EMAIL_CHECK_LIMIT, EMAIL_CHECK_WINDOW_MS))) {
       return res.status(429).json({ message: '확인을 너무 많이 했습니다. 15분 뒤 다시 시도하거나 팀장에게 문의해 주세요' })
+    }
+    if (!(await takeAttempt('email-check:all', EMAIL_CHECK_GLOBAL_LIMIT, EMAIL_CHECK_GLOBAL_WINDOW_MS))) {
+      return res.status(429).json({ message: '지금은 이메일 확인 요청이 많아 잠시 멈췄습니다. 잠시 뒤 다시 시도하거나 팀장에게 문의해 주세요' })
     }
     const registered = !!(await User.exists({ email }))
     res.json({ email, registered })

@@ -24,6 +24,11 @@ exports.takeAttempt = async (key, limit, windowMs) => {
   return doc.attempts <= limit
 }
 
+// 성공한 시도는 세지 않도록 방금 예약한 1회를 되돌린다 (예: 로그인 성공)
+exports.refundAttempt = async (key) => {
+  await PinAttempt.updateOne({ key, attempts: { $gt: 0 } }, { $inc: { attempts: -1 } })
+}
+
 // Vercel은 X-Forwarded-For를 실제 접속 주소로 덮어쓰므로(위조 불가) 이것을 먼저 쓴다.
 // (다른 곳에 배포한다면 그 환경이 이 헤더를 덮어쓰는지 확인해야 한다)
 exports.clientIp = (req) =>
