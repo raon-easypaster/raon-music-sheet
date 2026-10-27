@@ -432,11 +432,11 @@ export default function SetlistDetail({
                 type="password"
                 inputMode="numeric"
                 autoComplete="off"
-                placeholder="숫자 4~8자리"
+                placeholder="숫자 6~8자리"
                 value={pinInput}
                 onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 8))}
               />
-              <button type="button" className="secondary" onClick={() => savePin(false)} disabled={pinInput.length < 4}>
+              <button type="button" className="secondary" onClick={() => savePin(false)} disabled={pinInput.length < 6}>
                 {setlist.hasSharePin ? '바꾸기' : '걸기'}
               </button>
               {setlist.hasSharePin && (

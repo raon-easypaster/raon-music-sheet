@@ -105,7 +105,7 @@ export default function PublicSetlistView() {
           type="password"
           inputMode="numeric"
           autoComplete="off"
-          placeholder="숫자 4~8자리"
+          placeholder="숫자 비밀번호"
           value={pinInput}
           onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 8))}
           autoFocus
