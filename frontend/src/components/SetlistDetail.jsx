@@ -4,6 +4,7 @@ import { sortSongs, filterSongs, countByKey, filterByKey, KEY_ORDER } from '../u
 import FavoriteStar from './FavoriteStar'
 import PrintView from './PrintView'
 import SongFilterBar from './SongFilterBar'
+import { precacheSheets } from '../utils/offline'
 import { formatKoreanDate, isoToDateInput, addDays, nextSunday } from '../utils/dates'
 import { usageStats, usageText, applyMetaFilters, checkSetlist, EMPTY_FILTERS } from '../utils/songMeta'
 import { ITEM_KINDS, KIND_LABEL, SERVICE_TYPES, buildRows, toPayload, timeline, formatMinutes } from '../utils/serviceOrder'
@@ -71,6 +72,7 @@ export default function SetlistDetail({
   const [editingRow,    setEditingRow]    = useState(null)   // 고치는 중인 순서 항목 key
   const [rowForm,       setRowForm]       = useState({ title: '', minutes: '', note: '' })
   const [templateMsg,   setTemplateMsg]   = useState('')
+  const [offlineMsg,    setOfflineMsg]    = useState('')
 
   // drag state
   const dragIndex = useRef(null)
@@ -93,6 +95,7 @@ export default function SetlistDetail({
     setNewItem(null)
     setEditingRow(null)
     setTemplateMsg('')
+    setOfflineMsg('')
     // 연습완료 localStorage 복원
     if (setlist?._id) {
       try {
@@ -284,6 +287,18 @@ export default function SetlistDetail({
     try { await onUpdateSetlist(setlist._id, { startTime: value }) } catch (err) { setError(err.message) }
   }
 
+  // 예배당 인터넷이 약할 때를 위해 이 콘티 악보 사진을 이 기기에 저장해 둔다
+  async function saveOffline() {
+    const urls = localSongs.map((s) => s.sheetImageUrl).filter(Boolean)
+    if (!urls.length) return setOfflineMsg('이 콘티에는 저장할 악보 사진이 없습니다.')
+    setOfflineMsg('악보를 저장하는 중…')
+    const r = await precacheSheets(urls)
+    if (!r.supported) return setOfflineMsg('이 브라우저에서는 오프라인 저장을 쓸 수 없습니다. 앱으로 설치하거나 크롬·사파리 최신 버전을 써 주세요.')
+    setOfflineMsg(r.failed
+      ? `악보 ${r.saved + r.skipped}장 저장, ${r.failed}장은 저장하지 못했습니다. 인터넷이 될 때 다시 눌러 주세요.`
+      : `악보 ${r.saved + r.skipped}장을 이 기기에 저장했습니다. 인터넷이 끊겨도 공유 화면에서 볼 수 있어요.`)
+  }
+
   async function handleSaveTemplate() {
     const name = window.prompt('템플릿 이름 (곡은 빼고 순서만 저장합니다)', setlist.serviceType || setlist.name)
     if (!name?.trim()) return
@@ -472,6 +487,10 @@ export default function SetlistDetail({
           <button type="button" className="secondary" style={{ fontSize: 13 }} onClick={handleDuplicate}>
             📄 복제
           </button>
+          <button type="button" className="secondary" style={{ fontSize: 13 }} onClick={saveOffline} disabled={!localSongs.length}
+            title="예배당 인터넷이 약할 때를 위해 악보 사진을 이 기기에 저장">
+            ⬇ 악보 오프라인 저장
+          </button>
           {onSaveTemplate && (
             <button type="button" className="secondary" style={{ fontSize: 13 }} onClick={handleSaveTemplate} disabled={!localRows.length}
               title="이 콘티의 예배 순서를 템플릿으로 저장 (곡은 '찬양 자리'로 남김)">
@@ -481,6 +500,7 @@ export default function SetlistDetail({
         </div>
       </div>
       {templateMsg && <p className="ok-text">{templateMsg}</p>}
+      {offlineMsg && <p className="ok-text">{offlineMsg}</p>}
 
       {warnings.length > 0 && (
         <div className="check-box" role="status">

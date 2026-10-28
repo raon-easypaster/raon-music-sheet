@@ -28,6 +28,7 @@ import SetlistDetail from '../components/SetlistDetail'
 import TeamPanel from '../components/TeamPanel'
 import HelpPage from '../components/HelpPage'
 import PracticeTools from '../components/PracticeTools'
+import InstallAppButton from '../components/InstallAppButton'
 
 const TABS = ['곡 목록', '콘티', '팀', '연습 도구', '사용법']
 const TAB_COUNTED = { 0: 'songs', 1: 'setlists' } // 곡 목록·콘티 탭에는 개수를 함께 보여 준다
@@ -190,6 +191,7 @@ export default function Dashboard() {
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button className="secondary" onClick={() => { setShowPwModal(true); setPwMsg('') }}>비밀번호 변경</button>
+          <InstallAppButton />
           <button className="secondary" onClick={logout}>로그아웃</button>
         </div>
       </header>
@@ -334,7 +336,7 @@ export default function Dashboard() {
               onItemsMoved={(teamId) => { setWorkspace(teamId); setSelectedSetlistId(null) }}
             />
           )}
-          {tab === 3 && <PracticeTools />}
+          {tab === 3 && <PracticeTools songs={songs} />}
           {tab === 4 && <HelpPage />}
         </>
       )}
