@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import ScaleChart from './ScaleChart'
+import YoutubeLoopPlayer from './YoutubeLoopPlayer'
 
 const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 const MINOR = ['Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'A#m', 'Bm']
@@ -403,9 +404,13 @@ function Tuner() {
 }
 
 // ── 메인 ──────────────────────────────────────────────
-export default function PracticeTools() {
+// songs: 곡 목록 (있으면 유튜브 링크가 있는 곡을 골라 연습할 수 있다. 없어도 된다)
+export default function PracticeTools({ songs = [] } = {}) {
   return (
     <div>
+      <div style={{ marginBottom: 20 }}>
+        <YoutubeLoopPlayer songs={Array.isArray(songs) ? songs : []} />
+      </div>
       <div className="tools-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, alignItems: 'start' }}>
         <Metronome />
         <Tuner />
