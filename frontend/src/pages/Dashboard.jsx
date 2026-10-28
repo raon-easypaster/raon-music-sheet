@@ -29,8 +29,10 @@ import TeamPanel from '../components/TeamPanel'
 import HelpPage from '../components/HelpPage'
 import PracticeTools from '../components/PracticeTools'
 import InstallAppButton from '../components/InstallAppButton'
+import TeamNews from '../components/TeamNews'
+import useTeamUnread from '../components/useTeamUnread'
 
-const TABS = ['곡 목록', '콘티', '팀', '연습 도구', '사용법']
+const TABS = ['곡 목록', '콘티', '팀', '팀 소식', '연습 도구', '사용법']
 const TAB_COUNTED = { 0: 'songs', 1: 'setlists' } // 곡 목록·콘티 탭에는 개수를 함께 보여 준다
 const WORKSPACE_KEY = 'workspace'
 
@@ -181,6 +183,8 @@ export default function Dashboard() {
 
   const selectedSetlist = setlists.find((s) => s._id === selectedSetlistId) || null
   const currentTeam = teams.find((t) => t._id === workspace) || null
+  // 팀 소식 탭 배지 (안 읽은 글 + 답하지 않은 배정)
+  const teamNews = useTeamUnread(mustChangePassword ? '' : currentTeam?._id, tab)
 
   return (
     <div className="dashboard">
@@ -275,6 +279,7 @@ export default function Dashboard() {
             {TAB_COUNTED[i] && !loading && (
               <span className="tab-count">{TAB_COUNTED[i] === 'songs' ? songs.length : setlists.length}</span>
             )}
+            {name === '팀 소식' && teamNews.total > 0 && <span className="tab-count tab-unread">{teamNews.total}</span>}
           </button>
         ))}
       </nav>
@@ -336,8 +341,16 @@ export default function Dashboard() {
               onItemsMoved={(teamId) => { setWorkspace(teamId); setSelectedSetlistId(null) }}
             />
           )}
-          {tab === 3 && <PracticeTools songs={songs} />}
-          {tab === 4 && <HelpPage />}
+          {tab === 3 && (
+            <TeamNews
+              team={currentTeam}
+              currentUserId={user?._id}
+              pendingAssignments={teamNews.pendingAssignments}
+              onChanged={teamNews.refresh}
+            />
+          )}
+          {tab === 4 && <PracticeTools songs={songs} />}
+          {tab === 5 && <HelpPage />}
         </>
       )}
     </div>

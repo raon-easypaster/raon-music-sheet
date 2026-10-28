@@ -1,0 +1,81 @@
+/* ===== 팀 소식 · 팀원 배정 (TeamNews, AssignmentPanel) ===== */
+
+/* .muted는 초록 배경용 밝은 회색이라 흰 카드 안에서는 진한 회색을 쓴다 */
+.tx .muted, .tx-box .muted { color: #64748b; }
+
+.tx-box { border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px; margin: 12px 0; background: #fff; }
+.tx-title { font-size: 16px; margin: 16px 0 6px; }
+.tx-box .tx-title { margin-top: 0; }
+.tx-note { font-size: 13px; margin-bottom: 10px; }
+.tx-team-name { font-size: 14px; font-weight: 400; margin-left: 6px; }
+
+/* 소제목 버튼 묶음 (공지/기도제목, 섹션 고르기) */
+.tx-segment { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.tx-segment button { background: #f1f5f9; color: #334155; padding: 7px 14px; border-radius: 999px; font-size: 14px; }
+.tx-segment button.active { background: #14532d; color: white; }
+.tx-sections { display: flex; }
+.tx-dot { margin-left: 6px; padding: 0 7px; border-radius: 999px; background: #dc2626; color: white; font-size: 12px; font-weight: 700; }
+.tab-unread { background: #dc2626 !important; color: white !important; }
+
+/* 입력 줄 */
+.tx-form, .tx-inline { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.tx-form input, .tx-form select, .tx-inline input { width: auto; flex: 1 1 140px; min-width: 0; padding: 8px 10px; border-radius: 8px; }
+.tx-form select, .tx-inline select { border: 1px solid #d1d5db; background: white; font: inherit; }
+.tx-form input[type='date'] { flex: 0 1 170px; }
+.tx-date-label { margin: 0; white-space: nowrap; flex: none; }
+.tx-form button, .tx-inline button { flex: none; }
+.tx-post-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid #e2e8f0; }
+.tx-post-form .tx-segment { margin-bottom: 0; }
+.tx-post-form textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px; font: inherit; resize: vertical; }
+.tx-post-form .tx-inline { justify-content: flex-end; margin: 0; }
+
+/* 목록 */
+.tx-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.tx-row, .tx-post { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; background: #f8fafc; }
+.tx-row-main { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.tx-name { overflow-wrap: anywhere; font-size: 14px; }
+.tx-role { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #e0e7ff; color: #3730a3; }
+.tx-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tx-actions button, .tx-small { padding: 6px 12px; font-size: 13px; }
+.tx-small { margin-left: 8px; }
+.tx-reason { font-size: 13px; color: #991b1b; margin: 6px 0 0; }
+.tx-more { margin-top: 10px; width: 100%; }
+
+/* 상태 표시 */
+.tx-status { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.tx-status-pending { background: #fef9c3; color: #a16207; }
+.tx-status-accepted { background: #dcfce7; color: #15803d; }
+.tx-status-declined { background: #fee2e2; color: #b91c1c; }
+.tx-warn { font-size: 12px; font-weight: 600; color: #b45309; background: #ffedd5; padding: 2px 8px; border-radius: 999px; }
+.tx-warn-block { display: inline-block; margin: 0 0 6px; border-radius: 8px; padding: 6px 10px; }
+
+/* 공지 · 기도제목 */
+.tx-post-pinned { border-color: #86efac; background: #f0fdf4; }
+.tx-post-title { overflow-wrap: anywhere; }
+.tx-post-body { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; margin: 8px 0 6px; color: #1f2937; }
+.tx-kind { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.tx-kind-notice { background: #dbeafe; color: #1d4ed8; }
+.tx-kind-prayer { background: #f3e8ff; color: #7e22ce; }
+.tx-kind-pinned { background: #14532d; color: white; }
+.tx-pray.active { background: #7e22ce; color: white; }
+
+/* 못 나오는 날 */
+.tx-month { margin-top: 12px; }
+.tx-day { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+.tx-day-date { flex: none; min-width: 92px; padding-top: 2px; }
+.tx-day-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; font-size: 14px; min-width: 0; overflow-wrap: anywhere; }
+.tx-mine { font-weight: 600; }
+
+/* 출석 */
+.tx-stats { list-style: none; padding: 0; margin: 0 0 8px; display: flex; flex-direction: column; gap: 6px; }
+.tx-stats li { display: grid; grid-template-columns: minmax(0, 2fr) minmax(60px, 3fr) 92px; align-items: center; gap: 10px; font-size: 14px; }
+.tx-bar { height: 10px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+.tx-bar span { display: block; height: 100%; background: #15803d; border-radius: 999px; }
+.tx-rate { font-size: 13px; color: #334155; white-space: nowrap; text-align: right; }
+.tx-checks { margin: 10px 0 0; }
+
+@media (max-width: 600px) {
+  .tx-stats li { grid-template-columns: minmax(0, 1fr) auto; }
+  .tx-bar { grid-column: 1 / -1; grid-row: 2; }
+  .tx-day { flex-direction: column; gap: 2px; }
+}
