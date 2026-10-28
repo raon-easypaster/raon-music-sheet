@@ -2,6 +2,32 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { COPYRIGHT_NOTICE } from '../utils/copyright'
 import { formatKoreanDate } from '../utils/dates'
 import { KIND_LABEL, formatMinutes } from '../utils/serviceOrder'
+import { effectiveSheets, keyStateText } from '../utils/sheets'
+import { assetUrl } from '../api/client'
+import { renderPdfPages, explainPdfError } from '../utils/pdf'
+
+// 곡마다 '이번 Key로 고른 악보'의 모든 쪽을 인쇄 칸으로 (PDF는 쪽마다 그림으로 바꾼다)
+async function buildCells(songs) {
+  const cells = []
+  for (const [i, s] of songs.entries()) {
+    const sheet = s.choice ? s.choice.sheet : effectiveSheets(s)[0]
+    const base = { song: s, number: i + 1 }
+    if (!sheet) { cells.push({ ...base, key: `${s._id}:none` }); continue }
+    const pages = []
+    for (const page of sheet.pages) {
+      const url = assetUrl(page.url)
+      if (page.type === 'image') { pages.push({ key: page.id, src: url }); continue }
+      try {
+        const r = await renderPdfPages(url)
+        r.pages.forEach((pg) => pages.push({ key: `${page.id}#${pg.page}`, src: pg.src }))
+      } catch (err) {
+        pages.push({ key: `${page.id}#x`, error: explainPdfError(err, url).reason, openUrl: url })
+      }
+    }
+    pages.forEach((pg, k) => cells.push({ ...base, ...pg, key: `${s._id}:${pg.key}`, pageNo: k + 1, pageTotal: pages.length }))
+  }
+  return cells
+}
 
 // 용지별 크기(mm)와 한 장에 넣을 수 있는 악보 수 → [가로 칸, 세로 칸]
 const PAPERS = {
@@ -24,7 +50,16 @@ function loadPref() {
 export default function PrintView({ setlist, songs, order = null, totalMinutes = 0, onClose }) {
   const [pref, setPref] = useState(loadPref)
   const [scale, setScale] = useState(1)
+  const [built, setBuilt] = useState(null) // { forKey, cells }
   const areaRef = useRef(null)
+  const songsKey = songs.map((s) => `${s._id}:${(s.choice?.sheet?.pages || []).map((p) => p.url).join(',')}`).join('|')
+  const cells = built?.forKey === songsKey ? built.cells : null
+
+  useEffect(() => {
+    let alive = true
+    buildCells(songs).then((c) => { if (alive) setBuilt({ forKey: songsKey, cells: c }) })
+    return () => { alive = false }
+  }, [songs, songsKey])
   const paper = PAPERS[pref.paper]
   const [cols, rows] = paper.splits[pref.split]
   const perPage = cols * rows
@@ -44,11 +79,13 @@ export default function PrintView({ setlist, songs, order = null, totalMinutes =
     return () => window.removeEventListener('resize', fit)
   }, [paper.w])
 
+  // 인쇄 칸 = 악보 한 쪽 (여러 장 악보는 여러 칸)
   const pages = useMemo(() => {
     const out = []
-    for (let i = 0; i < songs.length; i += perPage) out.push(songs.slice(i, i + perPage))
+    const list = cells || []
+    for (let i = 0; i < list.length; i += perPage) out.push(list.slice(i, i + perPage))
     return out.length ? out : [[]]
-  }, [songs, perPage])
+  }, [cells, perPage])
 
   const title = [setlist.gigDate && formatKoreanDate(setlist.gigDate), setlist.name].filter(Boolean).join(' · ')
 
@@ -76,7 +113,7 @@ export default function PrintView({ setlist, songs, order = null, totalMinutes =
         <label>
           한 장에
           <select value={pref.split} onChange={(e) => setOption({ split: Number(e.target.value) })}>
-            {Object.keys(paper.splits).map((n) => <option key={n} value={n}>{n}곡</option>)}
+            {Object.keys(paper.splits).map((n) => <option key={n} value={n}>{n}쪽</option>)}
           </select>
         </label>
         <label className="print-check">
@@ -84,7 +121,7 @@ export default function PrintView({ setlist, songs, order = null, totalMinutes =
           첫 장에 {order ? '예배 순서' : '곡 순서'}
         </label>
         <span className="print-actions">
-          <button type="button" onClick={() => window.print()}>인쇄 / PDF로 저장</button>
+          <button type="button" onClick={() => window.print()} disabled={!cells}>{cells ? '인쇄 / PDF로 저장' : '악보 준비 중…'}</button>
           <button type="button" className="secondary" onClick={onClose}>닫기</button>
         </span>
         <p className="print-hint">
@@ -138,23 +175,24 @@ export default function PrintView({ setlist, songs, order = null, totalMinutes =
               className="print-grid"
               style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` }}
             >
-              {pageSongs.map((s) => {
-                const number = songs.indexOf(s) + 1
+              {pageSongs.map((cell) => {
+                const s = cell.song
+                const keyNote = s.choice ? keyStateText(s.choice) : ''
                 return (
-                  <figure key={s._id} className="print-cell">
+                  <figure key={cell.key} className="print-cell">
                     <figcaption>
-                      <b>{number}. {s.title}</b>
+                      <b>{cell.number}. {s.title}{cell.pageTotal > 1 && ` (${cell.pageNo}/${cell.pageTotal})`}</b>
                       {s.displayKey && <span className="print-key">{s.displayKey}</span>}
+                      {keyNote && cell.pageNo <= 1 && <small className="print-keynote">{keyNote}</small>}
                     </figcaption>
-                    {s.sheetImageUrl ? (
-                      <img src={s.sheetImageUrl} alt={`${s.title} 악보`} />
+                    {cell.src ? (
+                      <img src={cell.src} alt={`${s.title} 악보`} />
                     ) : (
                       <div className="print-empty">
-                        악보 이미지 없음
-                        {s.sheetPdfUrl && <small>PDF 악보: {s.sheetPdfUrl}</small>}
+                        {cell.error ? <>PDF를 열지 못했습니다<small>{cell.error} {cell.openUrl}</small></> : '악보 없음'}
                       </div>
                     )}
-                    {s.displayNotes && <p className="print-note">{s.displayNotes}</p>}
+                    {s.displayNotes && cell.pageNo <= 1 && <p className="print-note">{s.displayNotes}</p>}
                   </figure>
                 )
               })}

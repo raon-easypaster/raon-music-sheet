@@ -1,11 +1,13 @@
 /* RAON music sheet 서비스 워커
  * - 화면(앱 껍데기)을 저장해 두어 인터넷이 끊겨도 앱이 열리게 한다
- * - 악보 사진(/api/sheets/:id, 구글 사진)은 한 번 받으면 저장해 두고 다시 쓴다
+ * - 악보 사진·PDF(/api/sheets/:id, 구글 사진)는 한 번 받으면 저장해 두고 다시 쓴다
+ * - '악보 오프라인 저장'으로 미리 받은 다른 사이트의 악보 사진도 저장본이 있으면 그것을 쓴다
  * - 공유 콘티(/api/setlists/public/:token)는 마지막으로 받은 내용을 저장해 둔다
  * - 그 밖의 /api 응답(로그인 정보, 곡 목록 등)은 절대 저장하지 않는다
  * 화면 저장 방식을 바꾸면 SHELL_CACHE 번호를, 악보 저장 방식을 바꾸면 SHEET_CACHE 번호를 올린다.
  */
 const SHELL_CACHE = 'raon-shell-v1'
+// 이름을 바꾸면 src/utils/offline.js의 같은 이름도 바꾼다 (화면에서 저장 여부를 직접 확인한다)
 const SHEET_CACHE = 'raon-sheets-v1'
 const DATA_CACHE = 'raon-data-v1'
 const CURRENT_CACHES = [SHELL_CACHE, SHEET_CACHE, DATA_CACHE]
@@ -35,10 +37,22 @@ function isGoogleImageHost(hostname) {
   )
 }
 
-// 저장해도 되는 악보 사진 주소인지 (미리 저장 요청에도 같은 기준을 쓴다)
+// 저장해도 되는 악보 사진 주소인지 (보면서 저절로 저장하는 기준)
 function isSheetUrl(url) {
   if (url.origin === self.location.origin) return SHEET_RE.test(url.pathname)
   return url.protocol === 'https:' && isGoogleImageHost(url.hostname)
+}
+
+// '악보 오프라인 저장'으로 미리 받을 수 있는 주소: 위 주소 + 다른 https 사이트의 악보 사진
+function isPrecacheable(url) {
+  return isSheetUrl(url) || url.protocol === 'https:'
+}
+
+// 다른 사이트 악보 사진: 미리 저장해 둔 게 있으면 그것을, 없으면 인터넷에서 (저절로 저장하지는 않는다)
+async function sheetCacheOnly(request) {
+  const cache = await caches.open(SHEET_CACHE)
+  const cached = await cache.match(request.url, { ignoreVary: true })
+  return cached || fetch(request)
 }
 
 // ── 설치 / 활성화 ─────────────────────────────────────
@@ -161,6 +175,8 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) {
     if (request.destination === 'image' && isSheetUrl(url)) {
       event.respondWith(sheetCacheFirst(request))
+    } else if (request.destination === 'image' && url.protocol === 'https:') {
+      event.respondWith(sheetCacheOnly(request))
     }
     return // 그 밖의 다른 사이트 요청은 건드리지 않는다
   }
@@ -198,7 +214,7 @@ async function precacheSheets(urls) {
   for (const raw of list) {
     let url
     try { url = new URL(raw, self.location.origin) } catch { result.failed++; continue }
-    if (!isSheetUrl(url)) { result.failed++; continue }
+    if (!isPrecacheable(url)) { result.failed++; continue }
     if (await cache.match(url.href, { ignoreVary: true })) { result.skipped++; continue }
     try {
       const sameOrigin = url.origin === self.location.origin

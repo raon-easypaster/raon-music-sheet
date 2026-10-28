@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import SheetPhotoButton from './SheetPhotoButton'
+import SheetEditor from './SheetEditor'
 import SongMetaFields, { ThemePicker } from './SongMetaFields'
 import { EMPTY_META, customThemes } from '../utils/songMeta'
 
 const KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
                'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'A#m', 'Bm']
 
-const EMPTY = { title: '', artist: '', key: '', bpm: '', capo: 0, youtubeUrl: '', mrUrl: '', sheetImageUrl: '', sheetPdfUrl: '', structure: '', notes: '', ...EMPTY_META }
+const EMPTY = { title: '', artist: '', key: '', bpm: '', capo: 0, youtubeUrl: '', mrUrl: '', sheets: [], structure: '', notes: '', ...EMPTY_META }
 
 export default function SongForm({ onCreate, songs = [] }) {
   const [form, setForm] = useState(EMPTY)
@@ -109,7 +109,7 @@ export default function SongForm({ onCreate, songs = [] }) {
       {metaOpen && <SongMetaFields hideThemes value={form} onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))} />}
 
       <button type="button" className="secondary toggle-btn" onClick={() => setExpanded((v) => !v)}>
-        {expanded ? '▲ 링크·악보 접기' : '▼ 링크·악보 펼치기'}
+        {expanded ? '▲ 링크·악보 접기' : `▼ 링크·악보 펼치기${form.sheets.length ? ` (악보 ${form.sheets.length}개)` : ''}`}
       </button>
 
       {expanded && (
@@ -128,26 +128,7 @@ export default function SongForm({ onCreate, songs = [] }) {
             value={form.mrUrl}
             onChange={handleChange}
           />
-          {/* 올린 사진은 /api/sheets/... 주소라서 url 형식 검사를 하지 않는다 */}
-          <input
-            type="text"
-            inputMode="url"
-            name="sheetImageUrl"
-            placeholder="악보 이미지 URL (또는 아래에서 사진 올리기)"
-            value={form.sheetImageUrl}
-            onChange={handleChange}
-          />
-          <SheetPhotoButton
-            title={form.title}
-            onUploaded={(url) => setForm((prev) => ({ ...prev, sheetImageUrl: url }))}
-          />
-          <input
-            type="url"
-            name="sheetPdfUrl"
-            placeholder="악보 PDF URL"
-            value={form.sheetPdfUrl}
-            onChange={handleChange}
-          />
+          <SheetEditor value={form.sheets} title={form.title} onChange={(sheets) => setForm((prev) => ({ ...prev, sheets }))} />
           <input
             type="text"
             name="structure"

@@ -1,12 +1,18 @@
-import { useEffect, useMemo, useState, useRef } from 'react'
-import { getPublicCurrentSong, setCurrentSong } from '../api/setlists'
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
+import { getPractice, setPractice } from '../api/setlists'
 import { sortSongs, filterSongs, countByKey, filterByKey, KEY_ORDER } from '../utils/songSort'
 import FavoriteStar from './FavoriteStar'
 import PrintView from './PrintView'
 import SongFilterBar from './SongFilterBar'
 import AssignmentPanel from './AssignmentPanel'
+import LiveControl from './LiveControl'
+import SetlistStatusPanel from './SetlistStatusPanel'
+import ReadinessPanel from './ReadinessPanel'
 import Icon from './Icon'
-import { precacheSheets } from '../utils/offline'
+import { checkOffline, saveOffline as saveSheetsOffline, offlineSignature, sheetCacheUrl } from '../utils/offline'
+import { songSheetChoice, sheetName, keyStateText, pageCount } from '../utils/sheets'
+import { assetUrl } from '../api/client'
+import { warmPdfViewer } from '../utils/pdf'
 import { formatKoreanDate, isoToDateInput, addDays, nextSunday } from '../utils/dates'
 import { usageStats, usageText, applyMetaFilters, checkSetlist, EMPTY_FILTERS } from '../utils/songMeta'
 import { ITEM_KINDS, KIND_LABEL, SERVICE_TYPES, buildRows, toPayload, timeline, formatMinutes } from '../utils/serviceOrder'
@@ -46,6 +52,8 @@ export default function SetlistDetail({
   onDuplicate,
   onSongSettings,
   onSharePin,
+  onConfirm,
+  onRestore,
   team = null,
   currentUserId,
 }) {
@@ -59,15 +67,15 @@ export default function SetlistDetail({
   const [submitting, setSubmitting] = useState(false)
   const [shareLink,     setShareLink]     = useState(null)
   const [shareToken,    setShareToken]    = useState(null)
-  const [conductorIdx,  setConductorIdx]  = useState(0)
   const [copied,        setCopied]        = useState(false)
   const [summaryCopied, setSummaryCopied] = useState(false)
   const [showPlayer,    setShowPlayer]    = useState(false)
   const [playerIdx,     setPlayerIdx]     = useState(0)
-  const [practiced,     setPracticed]     = useState({})
+  const [practice,      setPracticeData]  = useState(null) // { mine: { songs }, team } — 로그인한 사람 기준
+  const [legacyPracticed, setLegacyPracticed] = useState(null) // 이 기기에만 남아 있는 예전 연습 표시
   const [showPrint,     setShowPrint]     = useState(false)
   const [settingsSong,  setSettingsSong]  = useState(null)   // Key·메모를 고치는 중인 곡
-  const [settingsForm,  setSettingsForm]  = useState({ key: '', notes: '' })
+  const [settingsForm,  setSettingsForm]  = useState({ key: '', notes: '', sheetId: '' })
   const [pinInput,      setPinInput]      = useState('')
   const [pinMsg,        setPinMsg]        = useState('')
   const [pickerFilters, setPickerFilters] = useState(EMPTY_FILTERS)
@@ -76,7 +84,14 @@ export default function SetlistDetail({
   const [editingRow,    setEditingRow]    = useState(null)   // 고치는 중인 순서 항목 key
   const [rowForm,       setRowForm]       = useState({ title: '', minutes: '', note: '' })
   const [templateMsg,   setTemplateMsg]   = useState('')
-  const [offlineMsg,    setOfflineMsg]    = useState('')
+  const [offlineStatus, setOfflineStatus] = useState(null)
+  const [offlineSaving, setOfflineSaving] = useState(false)
+  const [conflict,      setConflict]      = useState(null)   // 다른 사람이 먼저 고쳐서 저장하지 못한 경우 { message, changes }
+  const [online,        setOnline]        = useState(() => typeof navigator === 'undefined' || navigator.onLine !== false)
+  const [history,       setHistory]       = useState(null)
+  const confirmedEditOk = useRef(false) // 확정된 콘티를 고친다고 한 번 확인받았는지 (콘티마다)
+  const [liveOnline,    setLiveOnline]    = useState(true) // 실시간 진행 서버와 연결돼 있는지
+  const handleLiveStatus = useCallback(({ online: ok }) => setLiveOnline(ok), [])
 
   // drag state
   const dragIndex = useRef(null)
@@ -89,7 +104,9 @@ export default function SetlistDetail({
     setError('')
     setShareLink(null)
     setShareToken(null)
-    setConductorIdx(0)
+    setConflict(null)
+    setHistory(null)
+    confirmedEditOk.current = false
     setShowPlayer(false)
     setPlayerIdx(0)
     setShowPrint(false)
@@ -99,28 +116,71 @@ export default function SetlistDetail({
     setNewItem(null)
     setEditingRow(null)
     setTemplateMsg('')
-    setOfflineMsg('')
-    // 연습완료 localStorage 복원
-    if (setlist?._id) {
+    setOfflineStatus(null)
+    setPracticeData(null)
+    // 예전에는 연습 완료를 이 기기에만(사람 구분 없이) 저장했다. 남아 있으면 본인 기록인지 물어본 뒤에만 옮긴다
+    setLegacyPracticed(null)
+    if (setlist?._id && currentUserId) {
       try {
-        const saved = localStorage.getItem(`practiced_${setlist._id}`)
-        setPracticed(saved ? JSON.parse(saved) : {})
-      } catch { setPracticed({}) }
+        const saved = JSON.parse(localStorage.getItem(`practiced_${setlist._id}`) || 'null')
+        const dismissed = localStorage.getItem(`practicedLegacyDone_${setlist._id}_${currentUserId}`)
+        const ids = saved ? Object.keys(saved).filter((k) => saved[k]) : []
+        if (ids.length && !dismissed) setLegacyPracticed(ids)
+      } catch { /* 예전 기록이 없거나 읽을 수 없음 */ }
     }
+  }, [setlist?._id, currentUserId])
+
+  // 연습 완료 (서버, 로그인한 사람 기준) — 곡·Key·악보가 바뀌면 다시 불러와 '재확인 필요'를 반영한다
+  const loadPractice = useCallback(async () => {
+    if (!setlist?._id) return
+    try { setPracticeData(await getPractice(setlist._id)) } catch { /* 연습 기록을 못 불러와도 콘티는 쓸 수 있다 */ }
   }, [setlist?._id])
+  useEffect(() => { loadPractice() }, [loadPractice, setlist?.revision, setlist?.songs])
+
+  useEffect(() => {
+    const on = () => setOnline(true)
+    const off = () => setOnline(false)
+    window.addEventListener('online', on)
+    window.addEventListener('offline', off)
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off) }
+  }, [])
 
   // 저장 후 다시 불러온 곡 목록은 화면 상태(공유 링크 등)를 건드리지 않고 반영한다
   useEffect(() => {
     setLocalSongs(setlist?.songs ? setlist.songs.filter(s => typeof s !== 'string') : [])
   }, [setlist?.songs])
 
-  function togglePracticed(songId) {
+  // 곡 id → 'done' | 'stale'(완료 뒤 악보·Key·송폼·메모가 바뀜)
+  const practiced = useMemo(
+    () => Object.fromEntries((practice?.mine?.songs || []).map((p) => [String(p.song), p.stale ? 'stale' : 'done'])),
+    [practice]
+  )
+
+  async function togglePracticed(songId) {
     if (!setlist?._id) return
-    setPracticed(prev => {
-      const next = { ...prev, [songId]: !prev[songId] }
-      try { localStorage.setItem(`practiced_${setlist._id}`, JSON.stringify(next)) } catch {}
-      return next
-    })
+    const done = practiced[songId] !== 'done' // 재확인 필요 상태에서 누르면 다시 완료로
+    try {
+      const res = await setPractice(setlist._id, songId, done)
+      setPracticeData((prev) => ({ ...(prev || {}), mine: res.mine }))
+      loadPractice()
+    } catch (err) { setError(err.message) }
+  }
+
+  const legacyCount = (legacyPracticed || []).filter((id) => localSongs.some((s) => s._id === id)).length
+
+  async function importLegacyPractice(accept) {
+    const ids = legacyPracticed || []
+    try {
+      if (accept) {
+        const inSetlist = new Set(localSongs.map((s) => s._id))
+        for (const id of ids.filter((x) => inSetlist.has(x))) await setPractice(setlist._id, id, true)
+        localStorage.removeItem(`practiced_${setlist._id}`)
+        loadPractice()
+      } else {
+        localStorage.setItem(`practicedLegacyDone_${setlist._id}_${currentUserId}`, '1')
+      }
+    } catch (err) { setError(err.message) }
+    setLegacyPracticed(null)
   }
 
   const existingSongIds = useMemo(() => {
@@ -136,7 +196,8 @@ export default function SetlistDetail({
   const displaySongs = useMemo(
     () => localSongs.map((s) => {
       const own = settingsMap.get(s._id)
-      return { ...s, displayKey: own?.key || s.key, keyOverridden: !!own?.key, displayNotes: own?.notes || '' }
+      const choice = songSheetChoice(s, own) // 이번 Key에 맞춰 고른 악보 (공유·인쇄·오프라인 저장이 모두 이것을 쓴다)
+      return { ...s, displayKey: own?.key || s.key, keyOverridden: !!own?.key, displayNotes: own?.notes || '', choice }
     }),
     [localSongs, settingsMap]
   )
@@ -187,31 +248,41 @@ export default function SetlistDetail({
     )
   }
 
+  function showError(err) {
+    if (err?.conflict) setConflict({ message: err.message, changes: err.changes || [] })
+    else setError(err?.message || '저장하지 못했습니다')
+  }
+
+  // 콘티를 고치는 모든 동작이 거친다: 확정된 콘티면 한 번 확인받고,
+  // 다른 사람이 먼저 고쳐 저장이 막히면(충돌) 무엇이 바뀌었는지 보여 준다 (최신 내용은 다시 불러와 있음)
+  async function edit(action) {
+    if (setlist.status === 'confirmed' && !confirmedEditOk.current) {
+      if (!window.confirm('확정된 콘티입니다.\n고치면 ‘확정 후 변경’으로 기록되고, 팀원에게 변경 확인이 다시 요청됩니다. 계속할까요?')) return false
+      confirmedEditOk.current = true
+    }
+    setError('')
+    setConflict(null)
+    try {
+      await action()
+      return true
+    } catch (err) {
+      showError(err)
+      return false
+    }
+  }
+
   async function handleAddSongs() {
     if (!setlist || selectedSongIds.length === 0) return
-    setError('')
     setSubmitting(true)
-    try {
-      await onAddSongs(setlist._id, selectedSongIds)
-      setSelectedSongIds([])
-    } catch (err) {
-      setError(err.message || 'Request failed')
-    } finally {
-      setSubmitting(false)
-    }
+    if (await edit(() => onAddSongs(setlist._id, selectedSongIds))) setSelectedSongIds([])
+    setSubmitting(false)
   }
 
   async function handleRemoveSong(songId) {
     if (!setlist) return
-    setError('')
     setSubmitting(true)
-    try {
-      await onRemoveSong(setlist._id, songId)
-    } catch (err) {
-      setError(err.message || 'Request failed')
-    } finally {
-      setSubmitting(false)
-    }
+    await edit(() => onRemoveSong(setlist._id, songId))
+    setSubmitting(false)
   }
 
   // Drag-and-drop handlers
@@ -232,13 +303,10 @@ export default function SetlistDetail({
   // 순서 저장: 순서 항목이 있으면 전체 순서를, 곡만 있으면 곡 순서만 저장한다
   async function saveRows(rows) {
     setLocalRows(rows)
-    try {
-      if (hasItems || rows.some((r) => r.kind !== 'song')) await onUpdateItems(setlist._id, toPayload(rows))
-      else await onReorder(setlist._id, rows.map((r) => r.song))
-    } catch (err) {
-      setError(err.message || '순서를 저장하지 못했습니다')
-      setLocalRows(buildRows(setlist, songsById))
-    }
+    const ok = await edit(() => (hasItems || rows.some((r) => r.kind !== 'song')
+      ? onUpdateItems(setlist._id, toPayload(rows))
+      : onReorder(setlist._id, rows.map((r) => r.song))))
+    if (!ok) setLocalRows(buildRows(setlist, songsById))
   }
 
   async function handleDrop() {
@@ -284,23 +352,63 @@ export default function SetlistDetail({
   async function changeServiceType(value) {
     const v = value.trim()
     if (v === (setlist.serviceType || '')) return
-    try { await onUpdateSetlist(setlist._id, { serviceType: v }) } catch (err) { setError(err.message) }
+    await edit(() => onUpdateSetlist(setlist._id, { serviceType: v }))
   }
 
   async function changeStartTime(value) {
-    try { await onUpdateSetlist(setlist._id, { startTime: value }) } catch (err) { setError(err.message) }
+    await edit(() => onUpdateSetlist(setlist._id, { startTime: value }))
   }
 
-  // 예배당 인터넷이 약할 때를 위해 이 콘티 악보 사진을 이 기기에 저장해 둔다
+  // ── 이 기기 오프라인 저장 ──
+  // 곡마다 '이번 Key로 고른 악보'의 모든 쪽이 필요하다 (공유 화면·인쇄와 같은 선택)
+  const offlinePlan = useMemo(() => displaySongs.map((s) => {
+    const urls = []
+    const blocked = []
+    for (const page of s.choice.sheet?.pages || []) {
+      const url = sheetCacheUrl(assetUrl(page.url))
+      const external = !url.startsWith(window.location.origin)
+      if (!url) blocked.push('주소가 https가 아님')
+      else if (page.type === 'pdf' && external) blocked.push('외부 PDF — 파일로 올리면 저장 가능')
+      else urls.push(url)
+    }
+    return { songId: s._id, title: s.title, urls, blocked, hasPdf: s.choice.sheet?.pages.some((p) => p.type === 'pdf') }
+  }), [displaySongs])
+  const activeShareToken = shareToken || setlist?.shareToken
+  const offlineDataUrl = activeShareToken ? new URL(assetUrl(`/api/setlists/public/${activeShareToken}`), window.location.href).href : ''
+  const signature = offlineSignature(setlist?.revision || 0, offlinePlan)
+
+  const offlineCheckId = useRef(0) // 늦게 끝난 옛 확인 결과가 새 결과를 덮지 않도록
+  const refreshOffline = useCallback(async () => {
+    if (!setlist?._id) return
+    const checkId = ++offlineCheckId.current
+    let status
+    try {
+      status = await checkOffline({ setlistId: setlist._id, plan: offlinePlan, signature, dataUrl: offlineDataUrl })
+    } catch {
+      status = { state: 'unsupported', savedSongs: 0, totalSongs: 0, missing: [], blocked: [] }
+    }
+    if (checkId === offlineCheckId.current) setOfflineStatus(status)
+  }, [setlist?._id, offlinePlan, signature, offlineDataUrl])
+  useEffect(() => { refreshOffline() }, [refreshOffline])
+
+  // 예배당 인터넷이 약할 때를 위해 이 콘티 악보를 이 기기에 저장해 둔다. 저장 뒤 실제로 저장됐는지 다시 확인한다
   async function saveOffline() {
-    const urls = localSongs.map((s) => s.sheetImageUrl).filter(Boolean)
-    if (!urls.length) return setOfflineMsg('이 콘티에는 저장할 악보 사진이 없습니다.')
-    setOfflineMsg('악보를 저장하는 중…')
-    const r = await precacheSheets(urls)
-    if (!r.supported) return setOfflineMsg('이 브라우저에서는 오프라인 저장을 쓸 수 없습니다. 앱으로 설치하거나 크롬·사파리 최신 버전을 써 주세요.')
-    setOfflineMsg(r.failed
-      ? `악보 ${r.saved + r.skipped}장 저장, ${r.failed}장은 저장하지 못했습니다. 인터넷이 될 때 다시 눌러 주세요.`
-      : `악보 ${r.saved + r.skipped}장을 이 기기에 저장했습니다. 인터넷이 끊겨도 공유 화면에서 볼 수 있어요.`)
+    setOfflineSaving(true)
+    try {
+      const status = await saveSheetsOffline({
+        setlistId: setlist._id,
+        plan: offlinePlan,
+        signature,
+        dataUrl: offlineDataUrl,
+        warmPdf: offlinePlan.some((p) => p.hasPdf) ? warmPdfViewer : null,
+      })
+      offlineCheckId.current += 1
+      setOfflineStatus(status)
+    } catch {
+      await refreshOffline()
+    } finally {
+      setOfflineSaving(false)
+    }
   }
 
   async function handleSaveTemplate() {
@@ -325,28 +433,8 @@ export default function SetlistDetail({
     }
   }
 
-  // 공유 중일 때 현재 진행 인덱스 폴링 (3초)
-  useEffect(() => {
-    if (!shareToken) return
-    const poll = async () => {
-      try {
-        const { index } = await getPublicCurrentSong(shareToken)
-        setConductorIdx(index)
-      } catch {}
-    }
-    poll()
-    const id = setInterval(poll, 3000)
-    return () => clearInterval(id)
-  }, [shareToken])
-
-  async function conductGo(idx) {
-    if (!shareToken || idx < 0 || idx >= localSongs.length) return
-    setConductorIdx(idx)
-    try { await setCurrentSong(setlist._id, idx) } catch { /* 다음 폴링 때 다시 맞춰진다 */ }
-  }
-
   async function changeDate(value) {
-    try { await onUpdateSetlist(setlist._id, { gigDate: value || null }) } catch (err) { setError(err.message) }
+    await edit(() => onUpdateSetlist(setlist._id, { gigDate: value || null }))
   }
 
   async function handleDuplicate() {
@@ -355,20 +443,18 @@ export default function SetlistDetail({
     const gigDate = base ? addDays(base, 7) : nextSunday()
     const name = window.prompt('복제한 콘티의 이름', `${setlist.name} (복사)`)
     if (name === null) return
-    try { await onDuplicate(setlist._id, { name, gigDate }) } catch (err) { setError(err.message) }
+    try { await onDuplicate(setlist._id, { name, gigDate }) } catch (err) { showError(err) }
   }
 
   function openSettings(song) {
     const own = settingsMap.get(song._id)
     setSettingsSong(song)
-    setSettingsForm({ key: own?.key || '', notes: own?.notes || '' })
+    setSettingsForm({ key: own?.key || '', notes: own?.notes || '', sheetId: own?.sheetId || '' })
   }
 
   async function saveSettings(reset = false) {
-    try {
-      await onSongSettings(setlist._id, settingsSong._id, reset ? { key: '', notes: '' } : settingsForm)
-      setSettingsSong(null)
-    } catch (err) { setError(err.message) }
+    const ok = await edit(() => onSongSettings(setlist._id, settingsSong._id, reset ? { key: '', notes: '', sheetId: '' } : settingsForm))
+    if (ok) setSettingsSong(null)
   }
 
   async function savePin(clear = false) {
@@ -491,9 +577,9 @@ export default function SetlistDetail({
           <button type="button" className="secondary" style={{ fontSize: 13 }} onClick={handleDuplicate}>
             <Icon name="copy" />복제
           </button>
-          <button type="button" className="secondary" style={{ fontSize: 13 }} onClick={saveOffline} disabled={!localSongs.length}
-            title="예배당 인터넷이 약할 때를 위해 악보 사진을 이 기기에 저장">
-            <Icon name="download" />악보 오프라인 저장
+          <button type="button" className="secondary" style={{ fontSize: 13 }} onClick={saveOffline} disabled={!localSongs.length || offlineSaving}
+            title="예배당 인터넷이 약할 때를 위해 이번 Key로 고른 악보를 이 기기에 저장">
+            <Icon name="download" />{offlineSaving ? '저장 중…' : '악보 오프라인 저장'}
           </button>
           {onSaveTemplate && (
             <button type="button" className="secondary" style={{ fontSize: 13 }} onClick={handleSaveTemplate} disabled={!localRows.length}
@@ -504,7 +590,48 @@ export default function SetlistDetail({
         </div>
       </div>
       {templateMsg && <p className="ok-text">{templateMsg}</p>}
-      {offlineMsg && <p className="ok-text">{offlineMsg}</p>}
+
+      <SetlistStatusPanel
+        setlist={setlist}
+        team={team && String(setlist.team) === String(team._id) ? team : null}
+        currentUserId={currentUserId}
+        onConfirm={async (id, confirm) => { await onConfirm(id, confirm) }}
+        onRestore={async (id, revision) => { await onRestore(id, revision) }}
+        onError={showError}
+        onHistory={setHistory}
+      />
+
+      {conflict && (
+        <div className="conflict-box" role="alert">
+          <b>{conflict.message}</b>
+          {conflict.changes.length > 0 && (
+            <ul>{conflict.changes.slice(-8).map((c, i) => <li key={i}>{c}</li>)}</ul>
+          )}
+          <button type="button" className="secondary" onClick={() => setConflict(null)}>확인</button>
+        </div>
+      )}
+      {error && <p className="error-text">{error}</p>}
+
+      {legacyCount > 0 && (
+        <div className="legacy-practice" role="status">
+          이 기기에 예전 방식(기기에만 저장)으로 표시한 연습 완료 {legacyCount}곡이 있습니다.
+          본인이 표시한 것이 맞으면 내 계정 기록으로 옮겨, 다른 기기에서도 이어 보세요.
+          <span>
+            <button type="button" onClick={() => importLegacyPractice(true)}>내가 표시한 것 — 옮기기</button>
+            <button type="button" className="secondary" onClick={() => importLegacyPractice(false)}>내 것이 아님 · 옮기지 않기</button>
+          </span>
+        </div>
+      )}
+
+      <ReadinessPanel
+        setlist={setlist}
+        team={team}
+        songs={displaySongs}
+        offline={{ status: offlineStatus, saving: offlineSaving, onSave: saveOffline }}
+        online={online && liveOnline}
+        practice={practice}
+        history={history}
+      />
 
       {warnings.length > 0 && (
         <div className="check-box" role="status">
@@ -607,38 +734,11 @@ export default function SetlistDetail({
             {pinMsg && <span className="share-pin-msg">{pinMsg}</span>}
           </div>
 
-          {/* 진행 컨트롤러 */}
-          {localSongs.length > 0 && (
-            <div style={{ background: '#14532d', borderRadius: 12, padding: '12px 16px', marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
-              <button
-                onClick={() => conductGo(conductorIdx - 1)}
-                disabled={conductorIdx === 0}
-                style={{ width: 44, height: 44, border: 'none', borderRadius: 8, background: conductorIdx === 0 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.25)', color: '#fff', fontSize: 22, cursor: conductorIdx === 0 ? 'default' : 'pointer', flexShrink: 0 }}
-              >‹</button>
-
-              <div style={{ flex: 1, textAlign: 'center' }}>
-                <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 2 }}>
-                  🔴 실시간 진행 중 · {conductorIdx + 1} / {localSongs.length}곡
-                </div>
-                <div style={{ color: '#fff', fontWeight: 700, fontSize: 15, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-                  {localSongs[conductorIdx]?.title || '—'}
-                </div>
-                {displaySongs[conductorIdx]?.displayKey && (
-                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 }}>
-                    Key {displaySongs[conductorIdx].displayKey}
-                    {localSongs[conductorIdx].bpm > 0 && ` · ${localSongs[conductorIdx].bpm} BPM`}
-                  </div>
-                )}
-              </div>
-
-              <button
-                onClick={() => conductGo(conductorIdx + 1)}
-                disabled={conductorIdx === localSongs.length - 1}
-                style={{ width: 44, height: 44, border: 'none', borderRadius: 8, background: conductorIdx === localSongs.length - 1 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.25)', color: '#fff', fontSize: 22, cursor: conductorIdx === localSongs.length - 1 ? 'default' : 'pointer', flexShrink: 0 }}
-              >›</button>
-            </div>
-          )}
         </>
+      )}
+
+      {activeShareToken && localSongs.length > 0 && (
+        <LiveControl setlist={setlist} songs={displaySongs} onStatus={handleLiveStatus} />
       )}
 
       <div className="section-block">
@@ -657,10 +757,14 @@ export default function SetlistDetail({
         {/* 연습 진행도 */}
         {localSongs.length > 0 && (
           <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
-            연습 완료 {localSongs.filter(s => practiced[s._id]).length} / {localSongs.length}곡
-            {localSongs.filter(s => practiced[s._id]).length === localSongs.length && localSongs.length > 0 && (
+            내 연습 완료 {localSongs.filter(s => practiced[s._id] === 'done').length} / {localSongs.length}곡
+            {localSongs.some(s => practiced[s._id] === 'stale') && (
+              <span style={{ marginLeft: 6, color: '#b45309', fontWeight: 700 }}>· 변경 후 재확인 필요 {localSongs.filter(s => practiced[s._id] === 'stale').length}곡</span>
+            )}
+            {localSongs.filter(s => practiced[s._id] === 'done').length === localSongs.length && localSongs.length > 0 && (
               <span style={{ marginLeft: 6, color: '#15803d', fontWeight: 700 }}>🎉 전곡 완료!</span>
             )}
+            <span className="muted"> · 내 계정에 저장돼 다른 기기에서도 이어집니다</span>
           </div>
         )}
 
@@ -678,7 +782,7 @@ export default function SetlistDetail({
                 onDragStart={() => handleDragStart(idx)}
                 onDragOver={(e) => handleDragOver(e, idx)}
                 onDrop={handleDrop}
-                style={{ cursor: 'grab', userSelect: 'none', opacity: song && practiced[song._id] ? 0.6 : 1 }}
+                style={{ cursor: 'grab', userSelect: 'none', opacity: song && practiced[song._id] === 'done' ? 0.6 : 1 }}
               >
                 <div className="setlist-song-inner" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <span className="order-time" title={`${t?.minutes || 0}분`}>
@@ -693,20 +797,21 @@ export default function SetlistDetail({
                         onClick={(e) => { e.stopPropagation(); togglePracticed(song._id) }}
                         style={{
                           flexShrink: 0, width: 26, height: 26, borderRadius: 6,
-                          border: `2px solid ${practiced[song._id] ? '#15803d' : '#cbd5e1'}`,
-                          background: practiced[song._id] ? '#15803d' : 'transparent',
+                          border: `2px solid ${practiced[song._id] === 'done' ? '#15803d' : practiced[song._id] === 'stale' ? '#d97706' : '#cbd5e1'}`,
+                          background: practiced[song._id] === 'done' ? '#15803d' : practiced[song._id] === 'stale' ? '#fef3c7' : 'transparent',
                           cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 13, color: '#fff', lineHeight: 1,
+                          fontSize: 13, color: practiced[song._id] === 'stale' ? '#b45309' : '#fff', lineHeight: 1,
                         }}
-                        title="연습 완료 표시"
+                        title={practiced[song._id] === 'stale' ? '연습한 뒤 악보·Key·송폼·메모가 바뀌었습니다. 다시 확인하고 누르세요' : '연습 완료 표시 (내 계정)'}
+                        aria-label={practiced[song._id] === 'stale' ? '변경 후 재확인 필요' : practiced[song._id] ? '연습 완료' : '연습 완료 표시'}
                       >
-                        {practiced[song._id] ? '✓' : ''}
+                        {practiced[song._id] === 'done' ? '✓' : practiced[song._id] === 'stale' ? '↻' : ''}
                       </button>
 
-                      {/* 악보 썸네일 */}
-                      {song.sheetImageUrl && (
+                      {/* 악보 썸네일 (이번 Key로 고른 악보의 첫 사진) */}
+                      {song.choice.sheet?.pages.find((p) => p.type === 'image') && (
                         <img
-                          src={song.sheetImageUrl}
+                          src={assetUrl(song.choice.sheet.pages.find((p) => p.type === 'image').url)}
                           alt=""
                           style={{ width: 36, height: 48, objectFit: 'cover', borderRadius: 4, border: '1px solid #e2e8f0', flexShrink: 0 }}
                         />
@@ -728,6 +833,16 @@ export default function SetlistDetail({
                           {song.capo > 0 && <span className="badge" style={{ background: '#fef9c3', color: '#854d0e' }}>카포 {song.capo}</span>}
                           {song.bpm > 0 && <span className="badge badge-bpm">{song.bpm} BPM</span>}
                           {!usageOthers.get(song._id) && <span className="badge badge-new">처음 부르는 곡</span>}
+                          {song.choice.sheet ? (
+                            <span className={`badge sheet-badge sheet-${song.choice.keyState}`} title={keyStateText(song.choice) || sheetName(song.choice.sheet)}>
+                              {song.choice.keyState === 'mismatch' ? `⚠ 악보 ${song.choice.sheet.key} · 이번 ${song.choice.key}`
+                                : song.choice.keyState === 'unknown' ? '악보 Key 미확인'
+                                : `악보 ${song.choice.sheet.key || ''}`}
+                              {pageCount(song.choice.sheet) > 1 && ` · ${pageCount(song.choice.sheet)}장`}
+                              {song.choice.sheet.pages.some((p) => p.type === 'pdf') && ' · PDF'}
+                              {song.choice.chosen && ' · 직접 고름'}
+                            </span>
+                          ) : <span className="badge sheet-badge sheet-none">악보 없음</span>}
                         </div>
                         {song.structure && (
                           <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
@@ -753,8 +868,8 @@ export default function SetlistDetail({
 
                   <span className="row-actions">
                     {song && (
-                      <button type="button" className="secondary" onClick={() => openSettings(song)} title="이 콘티에서만 쓸 Key·메모">
-                        Key·메모
+                      <button type="button" className="secondary" onClick={() => openSettings(song)} title="이 콘티에서만 쓸 Key·메모·악보">
+                        Key·악보·메모
                       </button>
                     )}
                     <button type="button" className="secondary" onClick={() => openRowEdit(row)} title="시간·이름·메모">
@@ -819,12 +934,38 @@ export default function SetlistDetail({
             <b>‘{settingsSong.title}’ — 이 콘티에서만</b>
             <span className="muted-dark">곡 목록의 원래 정보(Key {settingsSong.key || '없음'})는 바뀌지 않습니다.</span>
             <label>
-              Key
+              이번에 부를 Key
               <select value={settingsForm.key} onChange={(e) => setSettingsForm((f) => ({ ...f, key: e.target.value }))}>
                 <option value="">원래 Key 그대로 ({settingsSong.key || '없음'})</option>
                 {KEY_ORDER.map((k) => <option key={k} value={k}>{k}</option>)}
               </select>
             </label>
+            <span className="muted-dark key-explain">
+              Key를 바꾸면 <b>부를 Key 이름만</b> 바뀝니다. 악보 사진·PDF가 자동으로 조옮김되지는 않아요.
+              그 Key로 된 악보가 등록돼 있으면 그 악보를 자동으로 씁니다.
+            </span>
+            {(() => {
+              const preview = songSheetChoice(settingsSong, settingsForm)
+              return (
+                <>
+                  <label>
+                    쓸 악보
+                    <select value={settingsForm.sheetId} onChange={(e) => setSettingsForm((f) => ({ ...f, sheetId: e.target.value }))}
+                      disabled={!preview.sheets.length}>
+                      <option value="">자동 (Key에 맞는 악보)</option>
+                      {preview.sheets.map((sh) => (
+                        <option key={sh.id} value={sh.id}>{sheetName(sh)} · {pageCount(sh)}장{sh.pages.some((p) => p.type === 'pdf') ? '(PDF)' : ''}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <span className={`key-preview sheet-${preview.keyState}`}>
+                    {preview.sheet
+                      ? <>쓸 악보: {sheetName(preview.sheet)}{keyStateText(preview) && <> — {keyStateText(preview)}</>}</>
+                      : '등록된 악보가 없습니다. 곡 목록에서 곡을 고쳐 악보를 넣어 주세요.'}
+                  </span>
+                </>
+              )
+            })()}
             <label>
               메모
               <textarea
@@ -971,7 +1112,6 @@ export default function SetlistDetail({
           </>
         )}
 
-        {error ? <p className="error-text">{error}</p> : null}
       </div>
 
       {showPrint && (

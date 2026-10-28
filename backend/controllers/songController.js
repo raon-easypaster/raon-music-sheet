@@ -3,8 +3,20 @@ const { resolveWorkspace, accessFilter, isTeamOwner, FORBIDDEN_WORKSPACE } = req
 
 const User = require('../models/User')
 const { cleanSongMeta, tempoFromBpm } = require('../utils/songMeta')
+const { cleanSheets, mirrorFields } = require('../utils/sheets')
 
 const SONG_FIELDS = ['title', 'artist', 'key', 'bpm', 'capo', 'youtubeUrl', 'mrUrl', 'sheetImageUrl', 'sheetPdfUrl', 'structure', 'notes']
+
+// 악보 목록(sheets)을 보냈으면 검사해서 넣고, 예전 칸(sheetImageUrl·sheetPdfUrl)을 첫 악보에 맞춘다
+// 보내지 않았으면 예전 방식 그대로 (data30.json·예전 화면)
+function applySheets(target, body) {
+  if (body.sheets === undefined) return null
+  const cleaned = cleanSheets(body.sheets)
+  if (cleaned.error) return cleaned.error
+  target.sheets = cleaned.sheets
+  Object.assign(target, mirrorFields(cleaned.sheets))
+  return null
+}
 
 // GET /songs?team=<팀 id>  (team이 없으면 내 개인 곡)
 exports.getSongs = async (req, res) => {
@@ -42,6 +54,8 @@ exports.createSong = async (req, res) => {
     SONG_FIELDS.forEach((f) => { if (req.body[f] !== undefined) data[f] = req.body[f] })
     Object.assign(data, cleanSongMeta(req.body))
     if (!data.tempo) data.tempo = tempoFromBpm(data.bpm)
+    const sheetError = applySheets(data, req.body)
+    if (sheetError) return res.status(400).json({ message: sheetError })
 
     const song = await Song.create(data)
     res.status(201).json(song)
@@ -59,6 +73,8 @@ exports.updateSong = async (req, res) => {
     SONG_FIELDS.forEach((f) => { if (req.body[f] !== undefined) song[f] = req.body[f] })
     Object.assign(song, cleanSongMeta(req.body))
     if (!song.tempo) song.tempo = tempoFromBpm(song.bpm)
+    const sheetError = applySheets(song, req.body)
+    if (sheetError) return res.status(400).json({ message: sheetError })
 
     const updated = await song.save()
     res.json(updated)

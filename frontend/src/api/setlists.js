@@ -11,24 +11,25 @@ export function createSetlist(payload) {
   })
 }
 
-export function addSongsToSetlist(id, songIds) {
+// baseRevision: 화면이 보고 있던 콘티 판 번호. 그 사이 다른 사람이 고쳤으면 서버가 409로 막는다
+export function addSongsToSetlist(id, songIds, baseRevision) {
   return apiFetch(`/setlists/${id}/songs`, {
     method: 'PUT',
-    body: JSON.stringify({ songIds }),
+    body: JSON.stringify({ songIds, baseRevision }),
   })
 }
 
-export function removeSongFromSetlist(id, songId) {
+export function removeSongFromSetlist(id, songId, baseRevision) {
   return apiFetch(`/setlists/${id}/remove-song`, {
     method: 'PUT',
-    body: JSON.stringify({ songId }),
+    body: JSON.stringify({ songId, baseRevision }),
   })
 }
 
-export function reorderSetlist(id, songIds) {
+export function reorderSetlist(id, songIds, baseRevision) {
   return apiFetch(`/setlists/${id}/reorder`, {
     method: 'PUT',
-    body: JSON.stringify({ songIds }),
+    body: JSON.stringify({ songIds, baseRevision }),
   })
 }
 
@@ -42,16 +43,16 @@ export function getPublicSetlist(token, pin) {
   return apiFetch(`/setlists/public/${token}`, { skipAuth: true, headers: pinHeader(pin) })
 }
 
+// 실시간 진행 상태. 로그인한 팀원이면 로그인 정보를 함께 보내 진행 권한을 받아 온다
 export function getPublicCurrentSong(token) {
-  return apiFetch(`/setlists/public/${token}/current`, { skipAuth: true })
+  return apiFetch(`/setlists/public/${token}/current`)
 }
 
-export function setPublicCurrentSong(token, index, pin) {
+// 진행자만 성공한다 (공유 링크만으로는 403)
+export function setPublicCurrentSong(token, index, { takeover = false } = {}) {
   return apiFetch(`/setlists/public/${token}/current`, {
     method: 'PUT',
-    skipAuth: true,
-    headers: pinHeader(pin),
-    body: JSON.stringify({ index }),
+    body: JSON.stringify({ index, takeover }),
   })
 }
 
@@ -61,28 +62,46 @@ export function deleteSetlist(id) {
   })
 }
 
-export function updateSetlist(id, payload) {
-  return apiFetch(`/setlists/${id}`, { method: 'PUT', body: JSON.stringify(payload) })
+export function updateSetlist(id, payload, baseRevision) {
+  return apiFetch(`/setlists/${id}`, { method: 'PUT', body: JSON.stringify({ ...payload, baseRevision }) })
 }
 
 export function duplicateSetlist(id, payload) {
   return apiFetch(`/setlists/${id}/duplicate`, { method: 'POST', body: JSON.stringify(payload) })
 }
 
-export function updateSongSettings(id, songId, payload) {
-  return apiFetch(`/setlists/${id}/song-settings/${songId}`, { method: 'PUT', body: JSON.stringify(payload) })
+export function updateSongSettings(id, songId, payload, baseRevision) {
+  return apiFetch(`/setlists/${id}/song-settings/${songId}`, { method: 'PUT', body: JSON.stringify({ ...payload, baseRevision }) })
 }
 
 export function setSharePin(id, pin) {
   return apiFetch(`/setlists/${id}/share-pin`, { method: 'PUT', body: JSON.stringify({ pin }) })
 }
 
-export function setCurrentSong(id, index) {
-  return apiFetch(`/setlists/${id}/current`, { method: 'PUT', body: JSON.stringify({ index }) })
+export function setCurrentSong(id, index, { takeover = false } = {}) {
+  return apiFetch(`/setlists/${id}/current`, { method: 'PUT', body: JSON.stringify({ index, takeover }) })
 }
 
-export function updateSetlistItems(id, items) {
-  return apiFetch(`/setlists/${id}/items`, { method: 'PUT', body: JSON.stringify({ items }) })
+export const getLive = (id) => apiFetch(`/setlists/${id}/live`)
+export const releaseLive = (id) => apiFetch(`/setlists/${id}/live/release`, { method: 'POST' })
+
+// 확정 · 이력 · 변경 확인 · 복원
+export const confirmSetlist = (id, baseRevision) =>
+  apiFetch(`/setlists/${id}/confirm`, { method: 'POST', body: JSON.stringify({ baseRevision }) })
+export const unconfirmSetlist = (id, baseRevision) =>
+  apiFetch(`/setlists/${id}/unconfirm`, { method: 'POST', body: JSON.stringify({ baseRevision }) })
+export const getHistory = (id) => apiFetch(`/setlists/${id}/history`)
+export const ackSetlist = (id, revision) => apiFetch(`/setlists/${id}/ack`, { method: 'POST', body: JSON.stringify({ revision }) })
+export const restoreSetlist = (id, revision, baseRevision) =>
+  apiFetch(`/setlists/${id}/restore`, { method: 'POST', body: JSON.stringify({ revision, baseRevision }) })
+
+// 연습 완료 (로그인한 사람 기준)
+export const getPractice = (id) => apiFetch(`/setlists/${id}/practice`)
+export const setPractice = (id, songId, done) =>
+  apiFetch(`/setlists/${id}/practice/${songId}`, { method: 'PUT', body: JSON.stringify({ done }) })
+
+export function updateSetlistItems(id, items, baseRevision) {
+  return apiFetch(`/setlists/${id}/items`, { method: 'PUT', body: JSON.stringify({ items, baseRevision }) })
 }
 
 const teamQuery = (team) => (team ? `?team=${team}` : '')

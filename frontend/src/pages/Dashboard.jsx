@@ -17,6 +17,9 @@ import {
   getTemplates,
   createTemplate,
   deleteTemplate,
+  confirmSetlist,
+  unconfirmSetlist,
+  restoreSetlist,
 } from '../api/setlists'
 import { changePasswordRequest } from '../api/auth'
 import { getMyTeams } from '../api/teams'
@@ -124,8 +127,27 @@ export default function Dashboard() {
 
   async function handleCreateSong(payload) { await createSong({ ...payload, team: workspace || null }); await loadData() }
   async function handleCreateSetlist(payload) { await createSetlist({ ...payload, team: workspace || null }); await loadData() }
-  async function handleAddSongs(setlistId, songIds) { await addSongsToSetlist(setlistId, songIds); await loadData() }
-  async function handleRemoveSong(setlistId, songId) { await removeSongFromSetlist(setlistId, songId); await loadData() }
+  // 콘티를 고칠 때는 화면이 보고 있던 판 번호를 함께 보낸다.
+  // 그 사이 다른 사람이 고쳤으면(409) 최신 내용을 다시 불러오고, 무엇이 바뀌었는지 담아 알린다 (내 변경으로 덮어쓰지 않음)
+  const revOf = (setlistId) => setlists.find((s) => s._id === setlistId)?.revision
+  async function editSetlist(setlistId, action) {
+    try {
+      const result = await action(revOf(setlistId))
+      await loadData()
+      return result
+    } catch (err) {
+      if (err.status === 409 && err.data?.conflict) {
+        await loadData()
+        const conflict = new Error(err.message)
+        conflict.conflict = true
+        conflict.changes = err.data.changes || []
+        throw conflict
+      }
+      throw err
+    }
+  }
+  async function handleAddSongs(setlistId, songIds) { await editSetlist(setlistId, (rev) => addSongsToSetlist(setlistId, songIds, rev)) }
+  async function handleRemoveSong(setlistId, songId) { await editSetlist(setlistId, (rev) => removeSongFromSetlist(setlistId, songId, rev)) }
   async function handleDeleteSetlist(setlistId) {
     try { await deleteSetlist(setlistId); await loadData() } catch (err) { setError(err.message) }
   }
@@ -134,7 +156,7 @@ export default function Dashboard() {
   }
   async function handleUpdateSong(id, payload) { await updateSong(id, payload); await loadData() }
   async function handleRenameTheme(from, to) { const res = await renameTheme(workspace, from, to); await loadData(); return res }
-  async function handleReorder(setlistId, songIds) { await reorderSetlist(setlistId, songIds); await loadData() }
+  async function handleReorder(setlistId, songIds) { await editSetlist(setlistId, (rev) => reorderSetlist(setlistId, songIds, rev)) }
   // 별을 누르면 화면에 바로 반영하고, 저장에 실패하면 되돌린다
   async function handleToggleFavorite(songId, favorite) {
     const apply = (value) => setSongs((prev) => prev.map((s) => (s._id === songId ? { ...s, isFavorite: value } : s)))
@@ -148,11 +170,15 @@ export default function Dashboard() {
   }
 
   async function handleShare(setlistId) { return generateShareToken(setlistId) }
-  async function handleUpdateSetlist(setlistId, payload) { await updateSetlist(setlistId, payload); await loadData() }
-  async function handleUpdateItems(setlistId, items) { await updateSetlistItems(setlistId, items); await loadData() }
+  async function handleUpdateSetlist(setlistId, payload) { await editSetlist(setlistId, (rev) => updateSetlist(setlistId, payload, rev)) }
+  async function handleUpdateItems(setlistId, items) { await editSetlist(setlistId, (rev) => updateSetlistItems(setlistId, items, rev)) }
+  async function handleConfirm(setlistId, confirm) {
+    await editSetlist(setlistId, (rev) => (confirm ? confirmSetlist(setlistId, rev) : unconfirmSetlist(setlistId, rev)))
+  }
+  async function handleRestore(setlistId, revision) { await editSetlist(setlistId, (rev) => restoreSetlist(setlistId, revision, rev)) }
   async function handleSaveTemplate(setlistId, name) { await createTemplate(setlistId, name); await loadData() }
   async function handleDeleteTemplate(templateId) { await deleteTemplate(templateId); await loadData() }
-  async function handleSongSettings(setlistId, songId, payload) { await updateSongSettings(setlistId, songId, payload); await loadData() }
+  async function handleSongSettings(setlistId, songId, payload) { await editSetlist(setlistId, (rev) => updateSongSettings(setlistId, songId, payload, rev)) }
   async function handleSharePin(setlistId, pin) { const res = await setSharePin(setlistId, pin); await loadData(); return res }
   async function handleDuplicate(setlistId, payload) {
     const copy = await duplicateSetlist(setlistId, payload)
@@ -337,6 +363,9 @@ export default function Dashboard() {
                   onDuplicate={handleDuplicate}
                   onSongSettings={handleSongSettings}
                   onSharePin={handleSharePin}
+                  onConfirm={handleConfirm}
+                  onRestore={handleRestore}
+                  onReload={loadData}
                   team={currentTeam}
                   currentUserId={user?._id}
                 />

@@ -5,6 +5,12 @@ const API_BASE_URL = import.meta.env.VITE_API_URL
     : 'http://localhost:5001/api';
 
   
+// 앱에 올린 악보 파일 주소(/api/sheets/…)를 실제로 열 수 있는 주소로 (개발 화면은 서버 주소가 달라서)
+export function assetUrl(url) {
+  if (!url || !url.startsWith('/api/') || !/^https?:/.test(API_BASE_URL)) return url
+  return API_BASE_URL.replace(/\/api$/, '') + url
+}
+
 export function getToken() {
   return localStorage.getItem('token')
 }

@@ -7,6 +7,7 @@ import './SheetAnnotator.css'
 // - 로그인한 팀원: 펜·형광펜·지우개로 그리면 잠시 뒤 저장되고, 함께 보는 사람 화면에도 몇 초 안에 나타난다
 // - 공유 링크로만 보는 사람: 필기를 보기만 한다 (켜기/끄기)
 // 좌표는 악보 이미지 크기에 대한 비율(0~1)로 저장하므로 화면 크기·확대와 상관없이 같은 자리에 그려진다
+// 필기는 악보 페이지(page)마다 따로 저장한다. 악보를 교체하면 페이지 번호가 바뀌어 예전 필기가 다른 페이지에 보이지 않는다
 
 const PEN_COLORS = [
   { value: '#dc2626', label: '빨강' },
@@ -110,8 +111,8 @@ function hitsStroke(stroke, x, y, w, h, radius) {
 
 // 불러오기·저장·주기적 동기화를 맡는다 (화면 그리기와는 분리)
 class AnnotationSession {
-  constructor({ shareToken, pin, songId, onChange }) {
-    Object.assign(this, { shareToken, pin, songId, onChange })
+  constructor({ shareToken, pin, songId, page, onChange }) {
+    Object.assign(this, { shareToken, pin, songId, page, onChange })
     this.strokes = []
     this.base = { strokes: [], version: 0 } // 마지막으로 서버와 맞춘 상태
     this.canEdit = false
@@ -160,7 +161,7 @@ class AnnotationSession {
   async fetchLatest() {
     if (this.canEdit && this.setlistId) {
       try {
-        return await getAnnotation(this.setlistId, this.songId)
+        return await getAnnotation(this.setlistId, this.songId, this.page)
       } catch (err) {
         if (![401, 403, 404].includes(err.status)) throw err
         // 팀에서 나갔거나 로그인이 끝남 → 보기 전용으로
@@ -169,7 +170,7 @@ class AnnotationSession {
         this.setStatus('lost')
       }
     }
-    return getPublicAnnotation(this.shareToken, this.songId, this.pin)
+    return getPublicAnnotation(this.shareToken, this.songId, this.pin, this.page)
   }
 
   applyServer(data) {
@@ -249,7 +250,7 @@ class AnnotationSession {
     this.emit()
     const sending = this.strokes
     try {
-      const data = await saveAnnotation(this.setlistId, this.songId, sending, this.base.version)
+      const data = await saveAnnotation(this.setlistId, this.songId, sending, this.base.version, this.page)
       this.base = { strokes: data.strokes, version: data.version }
       if (this.strokes === sending) {
         this.dirty = false
@@ -290,7 +291,7 @@ class AnnotationSession {
 }
 
 // toolbarHost: 도구 막대를 넣을 바깥 자리(DOM 요소). 주지 않으면 악보 위쪽에 띄운다 (null이면 자리가 생길 때까지 기다린다)
-export default function SheetAnnotator({ shareToken, pin, songId, wrapStyle, dark = false, toolbarHost, children }) {
+export default function SheetAnnotator({ shareToken, pin, songId, page, wrapStyle, dark = false, toolbarHost, children }) {
   const wrapRef = useRef(null)
   const canvasRef = useRef(null)
   const engineRef = useRef(null)
@@ -321,7 +322,7 @@ export default function SheetAnnotator({ shareToken, pin, songId, wrapStyle, dar
     engine.requestRedraw = () => { if (!engine.raf) engine.raf = requestAnimationFrame(redraw) }
 
     const session = new AnnotationSession({
-      shareToken, pin, songId,
+      shareToken, pin, songId, page,
       onChange: (s) => {
         setInfo({ canEdit: s.canEdit, count: s.strokes.length, undoCount: s.undo.length, status: s.status, errorText: s.errorText })
         if (!s.canEdit) setMode('view')
@@ -364,7 +365,7 @@ export default function SheetAnnotator({ shareToken, pin, songId, wrapStyle, dar
       session.dispose()
       engineRef.current = null
     }
-  }, [shareToken, pin, songId])
+  }, [shareToken, pin, songId, page])
 
   function toggleShown() {
     const next = !shown
@@ -459,7 +460,7 @@ export default function SheetAnnotator({ shareToken, pin, songId, wrapStyle, dar
   }
 
   function clearAll() {
-    if (!window.confirm('이 곡의 필기를 모두 지울까요?\n함께 보는 팀원 화면에서도 지워집니다.')) return
+    if (!window.confirm('이 페이지의 필기를 모두 지울까요?\n함께 보는 팀원 화면에서도 지워집니다.')) return
     engineRef.current?.session.clearAll()
   }
 

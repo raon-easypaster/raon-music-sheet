@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import SongViewer from './SongViewer'
 import FavoriteStar from './FavoriteStar'
-import SheetPhotoButton from './SheetPhotoButton'
+import SheetEditor from './SheetEditor'
+import { effectiveSheets } from '../utils/sheets'
 import SongMetaFields, { ThemePicker } from './SongMetaFields'
 import ThemeManager from './ThemeManager'
 import SongFilterBar from './SongFilterBar'
@@ -73,8 +74,9 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
       capo:          song.capo          ?? 0,
       youtubeUrl:    song.youtubeUrl    || '',
       mrUrl:         song.mrUrl         || '',
-      sheetImageUrl: song.sheetImageUrl || '',
-      sheetPdfUrl:   song.sheetPdfUrl   || '',
+      // 예전 방식 악보(사진 주소·PDF 주소 한 칸씩)도 악보 목록으로 보여 준다. 고치지 않으면 저장할 때 그대로 둔다
+      sheets:        effectiveSheets(song).map((sh) => ({ ...sh, pages: sh.pages.map((p) => ({ ...p })) })),
+      sheetsTouched: false,
       structure:     song.structure     || '',
       notes:         song.notes         || '',
       ...metaFormValues(song),
@@ -91,7 +93,8 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
     setSubmitting(true)
     setEditError('')
     try {
-      const payload = { ...editForm }
+      const { sheetsTouched, ...payload } = editForm
+      if (!sheetsTouched) delete payload.sheets // 악보를 건드리지 않았으면 예전 방식 그대로 둔다
       if (payload.bpm) payload.bpm = Number(payload.bpm)
       payload.capo = Number(payload.capo) || 0
       payload.durationMin = Number(payload.durationMin) || 0
@@ -245,8 +248,12 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
                 {song.target        && <span className="badge badge-meta">{song.target}</span>}
                 {song.hymnNumber    && <span className="badge badge-meta">{song.hymnNumber}</span>}
                 {song.youtubeUrl    && <span className="badge badge-link">YT</span>}
-                {song.sheetImageUrl && <span className="badge badge-link">악보</span>}
-                {song.sheetPdfUrl   && <span className="badge badge-link">PDF</span>}
+                {effectiveSheets(song).length > 0 && (
+                  <span className="badge badge-link" title="등록된 악보 (악보에 적힌 Key)">
+                    악보 {effectiveSheets(song).map((sh) => sh.key || 'Key?').join('·')}
+                  </span>
+                )}
+                {effectiveSheets(song).some((sh) => sh.pages.some((p) => p.type === 'pdf')) && <span className="badge badge-link">PDF</span>}
               </div>
               {/* 주제: 누르면 그 자리에서 바로 고친다 */}
               {themeEdit !== song._id && (
@@ -323,12 +330,8 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
                 <div className="expanded-fields">
                   <input type="url" placeholder="YouTube URL (예배곡 영상)" value={editForm.youtubeUrl} onChange={set('youtubeUrl')} />
                   <input type="url" placeholder="MR / 반주 URL" value={editForm.mrUrl} onChange={set('mrUrl')} />
-                  <input type="text" inputMode="url" placeholder="악보 이미지 URL (또는 아래에서 사진 올리기)" value={editForm.sheetImageUrl} onChange={set('sheetImageUrl')} />
-                  <SheetPhotoButton
-                    title={editForm.title}
-                    onUploaded={(url) => setEditForm((f) => ({ ...f, sheetImageUrl: url }))}
-                  />
-                  <input type="url" placeholder="악보 PDF URL" value={editForm.sheetPdfUrl} onChange={set('sheetPdfUrl')} />
+                  <SheetEditor value={editForm.sheets} title={editForm.title}
+                    onChange={(sheets) => setEditForm((f) => ({ ...f, sheets, sheetsTouched: true }))} />
                   <input type="text" placeholder="송폼 구조 (예: Intro - Verse - Chorus - Bridge)" value={editForm.structure} onChange={set('structure')} />
                   <textarea placeholder="메모 (연주 포인트, 전조 등)" value={editForm.notes} onChange={set('notes')} rows={3} />
                 </div>

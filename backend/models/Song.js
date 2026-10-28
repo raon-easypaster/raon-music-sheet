@@ -56,6 +56,29 @@ const songSchema = new mongoose.Schema(
       default: 0,
     },
 
+    // 악보 (Key별로 여러 개, 한 악보에 사진 여러 장 또는 PDF).
+    // 비어 있으면 위의 sheetImageUrl·sheetPdfUrl을 'Key 미확인' 악보로 쓴다 (예전 곡 그대로 동작).
+    // 채워져 있으면 sheetImageUrl·sheetPdfUrl은 첫 악보를 따라가는 사본이다.
+    sheets: {
+      type: [
+        {
+          _id: false,
+          id: { type: String, required: true },        // 악보 번호 (콘티에서 고른 악보를 가리킴)
+          key: { type: String, trim: true, default: '' }, // 악보에 실제로 적힌 Key. 빈 값 = 미확인
+          label: { type: String, trim: true, default: '' },
+          pages: [
+            {
+              _id: false,
+              id: { type: String, required: true },     // 페이지 번호 (필기가 이 번호에 붙는다)
+              type: { type: String, enum: ['image', 'pdf'], required: true },
+              url: { type: String, required: true },
+            },
+          ],
+        },
+      ],
+      default: [],
+    },
+
     // ── 곡 분류 (모두 선택 입력) ──
     tempo: { type: String, trim: true, default: '' },          // 느림 | 보통 | 빠름 (BPM으로 자동 채움, 바꿀 수 있음)
     timeSignature: { type: String, trim: true, default: '' },  // 4/4, 3/4, 6/8 …
