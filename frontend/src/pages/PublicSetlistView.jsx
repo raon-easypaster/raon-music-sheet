@@ -441,6 +441,7 @@ function MobileSongSlider({ songs, currentIdx, onSelect }) {
           <button
             key={s._id}
             data-idx={idx}
+            aria-current={idx === currentIdx ? 'true' : undefined}
             onClick={() => onSelect(idx)}
             style={{
               flexShrink: 0,

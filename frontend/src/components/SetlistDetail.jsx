@@ -845,7 +845,6 @@ export default function SetlistDetail({
 
       {team && (
         <div className="section-block">
-          <h3>팀원 배정</h3>
           <AssignmentPanel setlist={setlist} team={team} members={team.members} currentUserId={currentUserId} />
         </div>
       )}

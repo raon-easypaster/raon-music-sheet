@@ -105,8 +105,9 @@ input::placeholder, textarea::placeholder { color: var(--ink-3); }
 
 /* ── 상단 바 ── */
 .dashboard { max-width: 1240px; padding: 0 24px 40px; }
+.dashboard > .topbar { margin: 0 -24px 20px; }
 .topbar {
-  margin: 0 -24px 20px;
+  margin: 0;
   padding: 18px 24px;
   background: var(--brand);
   color: #f6f1e6;
@@ -210,6 +211,8 @@ input::placeholder, textarea::placeholder { color: var(--ink-3); }
   min-height: 100vh;
   display: grid;
   grid-template-columns: 1.1fr 1fr;
+  place-items: stretch;
+  padding: 0;
   background: var(--bg);
 }
 .auth-hero {
@@ -228,7 +231,7 @@ input::placeholder, textarea::placeholder { color: var(--ink-3); }
 .auth-page > .form-card { align-self: center; justify-self: center; width: min(420px, calc(100% - 32px)); margin: 32px 0; }
 .auth-page .form-card h1 { font-size: 26px; margin-bottom: 4px; }
 @media (max-width: 800px) {
-  .auth-page { grid-template-columns: 1fr; }
+  .auth-page { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   .auth-hero { padding: 28px 20px; border-right: none; border-bottom: 4px solid var(--gold); gap: 18px; }
   .auth-hero blockquote { font-size: 19px; }
   .auth-hero small { display: none; }
@@ -293,3 +296,13 @@ input::placeholder, textarea::placeholder { color: var(--ink-3); }
 .stage-mode .share-sidebar > div { border-bottom-color: var(--line) !important; color: var(--ink) !important; }
 .stage-mode button.secondary { background: var(--surface); color: var(--ink); border-color: var(--line); }
 .stage-mode .public-order li { background: var(--surface-2); }
+
+/* 콘티 만들기 칸 */
+.date-field input, .date-field select { flex: 1; min-width: 0; }
+.stage-mode .mobile-song-bar { background: var(--surface) !important; border-top-color: var(--line) !important; }
+.stage-mode .mobile-song-bar button:not(:disabled) { color: var(--ink-2) !important; }
+.stage-mode .mobile-song-bar [data-idx]:not([aria-current]) { background: var(--surface-2) !important; color: var(--ink-2) !important; }
+.stage-mode .share-copyright { background: var(--bg) !important; color: var(--ink-3) !important; }
+.stage-mode .viewer-notes { background: var(--surface-2); color: var(--ink); }
+.stage-mode .badge-key { background: #1d2a22; color: #8fd1a5; }
+.stage-mode .badge-bpm { background: var(--surface-2); color: var(--ink-2); }
