@@ -113,8 +113,12 @@ exports.createAssignment = async (req, res) => {
 exports.deleteAssignment = async (req, res) => {
   try {
     if (!isId(req.params.id)) return fail(res, 404, '배정을 찾을 수 없습니다')
-    const deleted = await Assignment.findOneAndDelete({ _id: req.params.id, team: req.team._id })
-    if (!deleted) return fail(res, 404, '배정을 찾을 수 없습니다')
+    const assignment = await Assignment.findOne({ _id: req.params.id, team: req.team._id })
+    if (!assignment) return fail(res, 404, '배정을 찾을 수 없습니다')
+    // 배정한 사람, 배정받은 본인, 팀장만 뺄 수 있다
+    const allowed = [assignment.createdBy, assignment.user].some((id) => sameId(id, req.user._id)) || isOwner(req.team, req.user)
+    if (!allowed) return fail(res, 403, '배정한 사람이나 본인, 팀장만 뺄 수 있습니다')
+    await assignment.deleteOne()
     res.json({ message: '배정을 뺐습니다' })
   } catch (err) {
     serverError(res, err)

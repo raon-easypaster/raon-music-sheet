@@ -5,6 +5,7 @@ const Setlist = require('../models/Setlist')
 const Song = require('../models/Song')
 const PinAttempt = require('../models/PinAttempt')
 const ServiceTemplate = require('../models/ServiceTemplate')
+const Assignment = require('../models/Assignment')
 const { cleanItems, cleanStartTime, toTemplateItems, syncItemsWithSongs } = require('../utils/serviceOrder')
 const { clientIp } = require('../utils/rateLimit')
 const { resolveWorkspace, accessFilter, canDelete, FORBIDDEN_WORKSPACE } = require('../utils/access')
@@ -159,6 +160,7 @@ exports.deleteSetlist = async (req, res) => {
     }
 
     await setlist.deleteOne()
+    await Assignment.deleteMany({ setlist: setlist._id }) // 이 콘티의 팀원 배정도 함께 지운다
     res.json({ message: 'Setlist deleted successfully' })
   } catch (err) {
     res.status(500).json({ message: err.message })
