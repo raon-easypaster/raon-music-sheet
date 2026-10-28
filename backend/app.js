@@ -8,6 +8,7 @@ const authRoutes = require('./routes/authRoutes')
 const teamRoutes = require('./routes/teamRoutes')
 const sheetRoutes = require('./routes/sheetRoutes')
 const teamExtrasRoutes = require('./routes/teamExtrasRoutes')
+const annotationRoutes = require('./routes/annotationRoutes')
 
 const app = express()
 
@@ -68,6 +69,7 @@ app.use('/api/teams', teamRoutes)
 app.use('/api/auth', authRoutes)
 app.use('/api/sheets', sheetRoutes)
 app.use('/api/team-extras', teamExtrasRoutes)
+app.use('/api/annotations', annotationRoutes)
 
 app.get('/', (req, res) => {
   res.send('RAON music sheet API running')

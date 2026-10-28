@@ -4,6 +4,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { getPublicSetlist, getPublicCurrentSong, setPublicCurrentSong } from '../api/setlists'
 import { COPYRIGHT_NOTICE } from '../utils/copyright'
 import { formatKoreanDate } from '../utils/dates'
+import SheetAnnotator from '../components/SheetAnnotator'
 
 function getYoutubeEmbedId(url) {
   if (!url) return null
@@ -227,12 +228,14 @@ export default function PublicSetlistView() {
           {/* 악보 이미지 — 잘리지 않게 width:100%, height:auto, 세로 스크롤 */}
           {song?.sheetImageUrl ? (
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' }}>
-              <img
-                src={song.sheetImageUrl}
-                alt="악보"
-                style={{ width: '100%', height: 'auto', display: 'block', userSelect: 'none' }}
-                draggable={false}
-              />
+              <SheetAnnotator key={song._id} shareToken={token} pin={pin} songId={song._id} dark>
+                <img
+                  src={song.sheetImageUrl}
+                  alt="악보"
+                  style={{ width: '100%', height: 'auto', display: 'block', userSelect: 'none' }}
+                  draggable={false}
+                />
+              </SheetAnnotator>
             </div>
           ) : (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#475569', gap: 8 }}>
@@ -324,6 +327,8 @@ export default function PublicSetlistView() {
           {song
             ? <SongContent
                 song={song}
+                shareToken={token}
+                pin={pin}
                 currentIdx={currentIdx}
                 totalSongs={songs.length}
                 onPrev={() => handleSelectSong(currentIdx - 1)}
@@ -461,9 +466,10 @@ function MobileSongSlider({ songs, currentIdx, onSelect }) {
 }
 
 /* ── 악보 콘텐츠 (줌 컨트롤 + 곡 내비게이션 포함) ──────────────────────────── */
-function SongContent({ song, currentIdx = 0, totalSongs = 1, onPrev, onNext }) {
+function SongContent({ song, shareToken, pin, currentIdx = 0, totalSongs = 1, onPrev, onNext }) {
   const [scale, setScale]     = useState(1)
   const [fitted, setFitted]   = useState(true)   // true = 세로 맞춤(전체 보기), false = 가로 스케일
+  const [toolbarHost, setToolbarHost] = useState(null) // 악보 위 필기 도구 막대 자리
   const touchStartX = useRef(null)
   const youtubeId = getYoutubeEmbedId(song.youtubeUrl)
 
@@ -534,6 +540,7 @@ function SongContent({ song, currentIdx = 0, totalSongs = 1, onPrev, onNext }) {
               >+</button>
             </div>
           </div>
+          <div ref={setToolbarHost} />
 
           {fitted ? (
             /* 세로 맞춤: 컨테이너 높이에 이미지 전체가 들어오도록 */
@@ -542,12 +549,14 @@ function SongContent({ song, currentIdx = 0, totalSongs = 1, onPrev, onNext }) {
               onTouchStart={onTouchStart}
               onTouchEnd={onTouchEnd}
             >
-              <img
-                src={song.sheetImageUrl}
-                alt="악보"
-                style={{ height: '100%', width: 'auto', maxWidth: 'none', display: 'block', objectFit: 'contain' }}
-                draggable={false}
-              />
+              <SheetAnnotator key={song._id} shareToken={shareToken} pin={pin} songId={song._id} toolbarHost={toolbarHost} wrapStyle={{ height: '100%', flexShrink: 0 }}>
+                <img
+                  src={song.sheetImageUrl}
+                  alt="악보"
+                  style={{ height: '100%', width: 'auto', maxWidth: 'none', display: 'block', objectFit: 'contain' }}
+                  draggable={false}
+                />
+              </SheetAnnotator>
               {/* 이전 곡 오버레이 */}
               {onPrev && currentIdx > 0 && (
                 <button
@@ -595,12 +604,15 @@ function SongContent({ song, currentIdx = 0, totalSongs = 1, onPrev, onNext }) {
           ) : (
             /* 가로 스케일 모드 */
             <div style={{ overflowX: 'auto', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-              <img
-                src={song.sheetImageUrl}
-                alt="악보"
-                className="sheet-image"
-                style={{ display: 'block', width: `${scale * 100}%`, maxWidth: 'none' }}
-              />
+              <SheetAnnotator key={song._id} shareToken={shareToken} pin={pin} songId={song._id} toolbarHost={toolbarHost} wrapStyle={{ width: `${scale * 100}%` }}>
+                <img
+                  src={song.sheetImageUrl}
+                  alt="악보"
+                  className="sheet-image"
+                  style={{ display: 'block', width: '100%', maxWidth: 'none' }}
+                  draggable={false}
+                />
+              </SheetAnnotator>
             </div>
           )}
         </div>
