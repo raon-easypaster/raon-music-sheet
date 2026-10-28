@@ -30,6 +30,14 @@ export default function LoginForm() {
 
   return (
     <div className="auth-page">
+      <section className="auth-hero" aria-hidden="true">
+        <span className="brand">RAON music sheet</span>
+        <blockquote>
+          호흡이 있는 자마다 여호와를 찬양할지어다
+          <cite>시편 150편 6절</cite>
+        </blockquote>
+        <small>라온동행교회 찬양팀 악보 &amp; 콘티</small>
+      </section>
       <form className="card form-card" onSubmit={handleSubmit}>
         <h1>RAON music sheet</h1>
         <p className="muted">찬양팀 악보 & 콘티 관리</p>

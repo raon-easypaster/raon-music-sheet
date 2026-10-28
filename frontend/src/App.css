@@ -673,7 +673,6 @@ button:hover {
 .template-manage li { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--line, #e2e8f0); border-radius: 10px; }
 .template-manage li > span { display: flex; flex-direction: column; min-width: 0; }
 .template-items { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.link-btn { background: none !important; border: none !important; color: var(--brand, #14532d) !important; padding: 0 !important; font-weight: 600; text-decoration: underline; cursor: pointer; }
 
 /* 인쇄 첫 장의 예배 순서표 */
 .print-service { width: 100%; border-collapse: collapse; font-size: 10pt; margin: 0 0 4mm; }

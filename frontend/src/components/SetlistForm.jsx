@@ -99,7 +99,7 @@ export default function SetlistForm({ onCreate, templates = [], onDeleteTemplate
 
       {templates.length > 0 && (
         <div className="template-manage">
-          <button type="button" className="link-btn" onClick={() => setShowTemplates((v) => !v)}>
+          <button type="button" className="text-btn" onClick={() => setShowTemplates((v) => !v)}>
             저장한 템플릿 {templates.length}개 {showTemplates ? '접기' : '보기'}
           </button>
           {showTemplates && (

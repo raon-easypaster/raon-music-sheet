@@ -29,10 +29,12 @@ import TeamPanel from '../components/TeamPanel'
 import HelpPage from '../components/HelpPage'
 import PracticeTools from '../components/PracticeTools'
 import InstallAppButton from '../components/InstallAppButton'
+import Icon from '../components/Icon'
 import TeamNews from '../components/TeamNews'
 import useTeamUnread from '../components/useTeamUnread'
 
 const TABS = ['곡 목록', '콘티', '팀', '팀 소식', '연습 도구', '사용법']
+const TAB_ICONS = ['music', 'list', 'users', 'bell', 'tool', 'help']
 const TAB_COUNTED = { 0: 'songs', 1: 'setlists' } // 곡 목록·콘티 탭에는 개수를 함께 보여 준다
 const WORKSPACE_KEY = 'workspace'
 
@@ -274,8 +276,10 @@ export default function Dashboard() {
             key={name}
             className={tab === i ? 'tab-btn active' : 'tab-btn'}
             onClick={() => setTab(i)}
+            aria-current={tab === i ? 'page' : undefined}
           >
-            {name}
+            <Icon name={TAB_ICONS[i]} size={18} />
+            <span className="tab-label">{name}</span>
             {TAB_COUNTED[i] && !loading && (
               <span className="tab-count">{TAB_COUNTED[i] === 'songs' ? songs.length : setlists.length}</span>
             )}
@@ -285,7 +289,9 @@ export default function Dashboard() {
       </nav>
 
       {loading && !loadedOnce ? (
-        <div className="card panel">불러오는 중...</div>
+        <div className="card panel skeleton" aria-busy="true" aria-label="불러오는 중">
+          <span /><span /><span /><span />
+        </div>
       ) : (
         <>
           {tab === 0 && (
@@ -329,6 +335,8 @@ export default function Dashboard() {
                   onDuplicate={handleDuplicate}
                   onSongSettings={handleSongSettings}
                   onSharePin={handleSharePin}
+                  team={currentTeam}
+                  currentUserId={user?._id}
                 />
               </div>
             </>

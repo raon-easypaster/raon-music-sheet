@@ -4,6 +4,7 @@ import App from './App'
 import { AuthProvider } from './context/AuthContext'
 import { registerServiceWorker } from './utils/offline'
 import './index.css'
+import './theme.css' // 디자인(색·글꼴·카드·메뉴) — 다른 스타일보다 나중에 불러와 덮어쓴다
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

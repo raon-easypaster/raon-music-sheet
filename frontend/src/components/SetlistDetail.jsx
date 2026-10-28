@@ -4,6 +4,8 @@ import { sortSongs, filterSongs, countByKey, filterByKey, KEY_ORDER } from '../u
 import FavoriteStar from './FavoriteStar'
 import PrintView from './PrintView'
 import SongFilterBar from './SongFilterBar'
+import AssignmentPanel from './AssignmentPanel'
+import Icon from './Icon'
 import { precacheSheets } from '../utils/offline'
 import { formatKoreanDate, isoToDateInput, addDays, nextSunday } from '../utils/dates'
 import { usageStats, usageText, applyMetaFilters, checkSetlist, EMPTY_FILTERS } from '../utils/songMeta'
@@ -44,6 +46,8 @@ export default function SetlistDetail({
   onDuplicate,
   onSongSettings,
   onSharePin,
+  team = null,
+  currentUserId,
 }) {
   const [selectedSongIds, setSelectedSongIds] = useState([])
   const [pickerSearch, setPickerSearch] = useState('')
@@ -469,32 +473,32 @@ export default function SetlistDetail({
           {localSongs.some(s => s.youtubeUrl) && (
             <button
               type="button"
-              style={{ fontSize: 13, background: showPlayer ? '#0f172a' : '#1e293b', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 12px', cursor: 'pointer', fontWeight: 600 }}
+              style={{ fontSize: 13 }}
               onClick={() => { setShowPlayer(v => !v); setPlayerIdx(0) }}
             >
-              {showPlayer ? '■ 재생 닫기' : '▶ 연속재생'}
+              <Icon name={showPlayer ? 'stop' : 'play'} />{showPlayer ? '재생 닫기' : '연속재생'}
             </button>
           )}
           <button type="button" className="secondary" style={{ fontSize: 13 }} onClick={copySummary}>
-            {summaryCopied ? '복사됨!' : '💬 카톡 요약'}
+            <Icon name="message" />{summaryCopied ? '복사됨!' : '카톡 요약'}
           </button>
           <button type="button" className="secondary" style={{ fontSize: 13 }} onClick={handleShare}>
-            🔗 공유 링크
+            <Icon name="link" />공유 링크
           </button>
           <button type="button" className="secondary" style={{ fontSize: 13 }} onClick={() => setShowPrint(true)} disabled={!localSongs.length}>
-            🖨 인쇄·PDF
+            <Icon name="printer" />인쇄·PDF
           </button>
           <button type="button" className="secondary" style={{ fontSize: 13 }} onClick={handleDuplicate}>
-            📄 복제
+            <Icon name="copy" />복제
           </button>
           <button type="button" className="secondary" style={{ fontSize: 13 }} onClick={saveOffline} disabled={!localSongs.length}
             title="예배당 인터넷이 약할 때를 위해 악보 사진을 이 기기에 저장">
-            ⬇ 악보 오프라인 저장
+            <Icon name="download" />악보 오프라인 저장
           </button>
           {onSaveTemplate && (
             <button type="button" className="secondary" style={{ fontSize: 13 }} onClick={handleSaveTemplate} disabled={!localRows.length}
               title="이 콘티의 예배 순서를 템플릿으로 저장 (곡은 '찬양 자리'로 남김)">
-              🗂 템플릿으로 저장
+              <Icon name="template" />템플릿으로 저장
             </button>
           )}
         </div>
@@ -563,18 +567,19 @@ export default function SetlistDetail({
             </button>
             <button
               type="button"
-              style={{ fontSize: 12, padding: '4px 10px', background: '#64748b', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}
+              className="secondary"
+              style={{ fontSize: 12, padding: '4px 10px' }}
               onClick={() => window.open(shareLink, '_blank')}
             >
-              🔗 미리보기
+              미리보기
             </button>
             <button
               type="button"
-              style={{ fontSize: 12, padding: '4px 10px', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}
+              style={{ fontSize: 12, padding: '4px 10px', background: 'var(--gold)' }}
               onClick={() => { navigator.clipboard.writeText(`${shareLink}?view=sheet`) }}
               title="악보 슬라이드 모드로 바로 열리는 링크 복사"
             >
-              📄 악보링크
+              <Icon name="file" />악보링크
             </button>
           </div>
 
@@ -837,6 +842,13 @@ export default function SetlistDetail({
           </div>
         )}
       </div>
+
+      {team && (
+        <div className="section-block">
+          <h3>팀원 배정</h3>
+          <AssignmentPanel setlist={setlist} team={team} members={team.members} currentUserId={currentUserId} />
+        </div>
+      )}
 
       <div className="section-block">
         <h3>곡 추가</h3>
