@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react'
 import SongViewer from './SongViewer'
 import FavoriteStar from './FavoriteStar'
 import SheetPhotoButton from './SheetPhotoButton'
-import SongMetaFields from './SongMetaFields'
+import SongMetaFields, { ThemePicker } from './SongMetaFields'
 import SongFilterBar from './SongFilterBar'
 import { exportSongsCsv, exportBackupJson } from '../utils/exporters'
 import { formatKoreanDate } from '../utils/dates'
-import { metaFormValues, usageStats, usageText, applyMetaFilters, sortByUsage, EMPTY_FILTERS, tempoFromBpm } from '../utils/songMeta'
+import { metaFormValues, usageStats, usageText, applyMetaFilters, sortByUsage, EMPTY_FILTERS, NO_THEME, hasNoTheme, tempoFromBpm } from '../utils/songMeta'
 import { sortSongs, filterSongs, countByKey, filterByKey } from '../utils/songSort'
 
 const KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
@@ -112,6 +112,17 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
             >
               ★ 즐겨찾기 ({favCount})
             </button>
+            {songs.some(hasNoTheme) && (
+              <button
+                type="button"
+                className={filters.tag === NO_THEME ? 'fav-filter on' : 'fav-filter'}
+                aria-pressed={filters.tag === NO_THEME}
+                title="주제·절기 태그가 없는 곡만 보기 — 수정을 눌러 주제를 넣으세요"
+                onClick={() => setFilters((f) => ({ ...f, tag: f.tag === NO_THEME ? '' : NO_THEME }))}
+              >
+                주제 없는 곡 ({songs.filter(hasNoTheme).length})
+              </button>
+            )}
             <input
               type="search"
               placeholder="제목·아티스트·코드·태그 검색"
@@ -243,10 +254,14 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
                 </select>
               </div>
 
+              <div className="theme-box">
+                <ThemePicker value={editForm.themes} onChange={(themes) => setEditForm((f) => ({ ...f, themes }))} />
+              </div>
+
               <button type="button" className="secondary toggle-btn" onClick={() => setMetaOpen(v => !v)}>
-                {metaOpen ? '▲ 분류 접기' : '▼ 분류 (주제·절기·빠르기·대상 등)'}
+                {metaOpen ? '▲ 그 밖의 분류 접기' : '▼ 그 밖의 분류 (빠르기·박자·대상·특성 등)'}
               </button>
-              {metaOpen && <SongMetaFields value={editForm} onChange={(patch) => setEditForm((f) => ({ ...f, ...patch }))} />}
+              {metaOpen && <SongMetaFields hideThemes value={editForm} onChange={(patch) => setEditForm((f) => ({ ...f, ...patch }))} />}
 
               <button type="button" className="secondary toggle-btn" onClick={() => setEditExpanded(v => !v)}>
                 {editExpanded ? '▲ 링크·악보 접기' : '▼ 링크·악보 펼치기'}

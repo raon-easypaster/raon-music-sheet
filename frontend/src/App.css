@@ -696,3 +696,8 @@ button:hover {
   .row-actions { flex-basis: 100%; justify-content: flex-end; }
   .type-input { width: 110px; }
 }
+
+/* 곡 추가·수정 창의 주제·절기 (접지 않고 바로 보임) */
+.theme-box { padding: 10px 12px; border: 1px solid var(--line, #e2e8f0); border-radius: 12px; background: var(--surface-2, #f8fafc); margin-bottom: 8px; }
+.theme-picker { display: flex; flex-direction: column; gap: 6px; }
+.theme-picker .meta-label { flex: none; }

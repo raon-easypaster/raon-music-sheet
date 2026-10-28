@@ -3,22 +3,14 @@ import { TEMPOS, TIME_SIGNATURES, TARGETS, TRAITS, THEMES, SEASONS, tempoFromBpm
 
 // 곡 분류 입력 (곡 추가·곡 수정 창이 함께 쓴다)
 // value: 폼 전체 값(bpm 포함), onChange(patch)
-export default function SongMetaFields({ value, onChange }) {
-  const [custom, setCustom] = useState('')
+// hideThemes: 주제·절기를 창 위쪽에 따로 보여 줄 때
+export default function SongMetaFields({ value, onChange, hideThemes = false }) {
   const themes = value.themes || []
   const traits = value.traits || []
   const autoTempo = tempoFromBpm(value.bpm)
 
   const toggle = (field, list, item) =>
     onChange({ [field]: list.includes(item) ? list.filter((t) => t !== item) : [...list, item] })
-
-  function addCustom() {
-    const tag = custom.trim().replace(/^#/, '').slice(0, 20)
-    if (tag && !themes.includes(tag)) onChange({ themes: [...themes, tag] })
-    setCustom('')
-  }
-
-  const extraTags = themes.filter((t) => !THEMES.includes(t) && !SEASONS.includes(t))
 
   return (
     <div className="meta-fields">
@@ -60,35 +52,7 @@ export default function SongMetaFields({ value, onChange }) {
         ))}
       </div>
 
-      <div className="meta-label">주제</div>
-      <div className="tag-chips">
-        {THEMES.map((t) => (
-          <button key={t} type="button" className={themes.includes(t) ? 'on' : ''} aria-pressed={themes.includes(t)}
-            onClick={() => toggle('themes', themes, t)}>{t}</button>
-        ))}
-      </div>
-      <div className="meta-label">절기</div>
-      <div className="tag-chips season">
-        {SEASONS.map((t) => (
-          <button key={t} type="button" className={themes.includes(t) ? 'on' : ''} aria-pressed={themes.includes(t)}
-            onClick={() => toggle('themes', themes, t)}>{t}</button>
-        ))}
-      </div>
-      <div className="tag-chips">
-        {extraTags.map((t) => (
-          <button key={t} type="button" className="on" title="눌러서 빼기" onClick={() => toggle('themes', themes, t)}>#{t} ✕</button>
-        ))}
-        <input
-          className="tag-input"
-          type="text"
-          placeholder="태그 직접 입력 후 Enter"
-          value={custom}
-          maxLength={20}
-          onChange={(e) => setCustom(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustom() } }}
-          onBlur={addCustom}
-        />
-      </div>
+      {!hideThemes && <ThemePicker value={themes} onChange={(list) => onChange({ themes: list })} />}
 
       <div className="row-fields">
         <input type="text" placeholder="찬송가 번호 (예: 새찬송가 305장)" maxLength={20}
@@ -101,6 +65,55 @@ export default function SongMetaFields({ value, onChange }) {
           value={value.lyricist || ''} onChange={(e) => onChange({ lyricist: e.target.value })} />
         <input type="text" placeholder="작곡" maxLength={60}
           value={value.composer || ''} onChange={(e) => onChange({ composer: e.target.value })} />
+      </div>
+    </div>
+  )
+}
+
+// 주제·절기 태그 고르기 (추천 태그 + 직접 입력)
+export function ThemePicker({ value = [], onChange }) {
+  const [custom, setCustom] = useState('')
+  const themes = value
+  const toggle = (t) => onChange(themes.includes(t) ? themes.filter((x) => x !== t) : [...themes, t])
+
+  function addCustom() {
+    const tag = custom.trim().replace(/^#/, '').slice(0, 20)
+    if (tag && !themes.includes(tag)) onChange([...themes, tag])
+    setCustom('')
+  }
+
+  const extraTags = themes.filter((t) => !THEMES.includes(t) && !SEASONS.includes(t))
+
+  return (
+    <div className="theme-picker">
+      <div className="meta-label">주제</div>
+      <div className="tag-chips">
+        {THEMES.map((t) => (
+          <button key={t} type="button" className={themes.includes(t) ? 'on' : ''} aria-pressed={themes.includes(t)}
+            onClick={() => toggle(t)}>{t}</button>
+        ))}
+      </div>
+      <div className="meta-label">절기</div>
+      <div className="tag-chips season">
+        {SEASONS.map((t) => (
+          <button key={t} type="button" className={themes.includes(t) ? 'on' : ''} aria-pressed={themes.includes(t)}
+            onClick={() => toggle(t)}>{t}</button>
+        ))}
+      </div>
+      <div className="tag-chips">
+        {extraTags.map((t) => (
+          <button key={t} type="button" className="on" title="눌러서 빼기" onClick={() => toggle(t)}>#{t} ✕</button>
+        ))}
+        <input
+          className="tag-input"
+          type="text"
+          placeholder="태그 직접 입력 후 Enter"
+          value={custom}
+          maxLength={20}
+          onChange={(e) => setCustom(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustom() } }}
+          onBlur={addCustom}
+        />
       </div>
     </div>
   )

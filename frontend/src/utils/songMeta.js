@@ -47,6 +47,10 @@ export function usageStats(setlists, today = toDateInput(new Date())) {
 }
 
 // 상세 검색 조건 (빈 값은 조건 없음)
+// 주제·절기 태그가 하나도 없는 곡 (상세 검색의 특별한 값)
+export const NO_THEME = '__none'
+export const hasNoTheme = (s) => !(s.themes || []).length
+
 export const EMPTY_FILTERS = { tempo: '', timeSignature: '', tag: '', target: '', trait: '', usage: '' }
 
 export const USAGE_FILTERS = [
@@ -60,7 +64,8 @@ export function applyMetaFilters(songs, f, usage, today = toDateInput(new Date()
   return songs.filter((s) => {
     if (f.tempo && (s.tempo || tempoFromBpm(s.bpm)) !== f.tempo) return false
     if (f.timeSignature && s.timeSignature !== f.timeSignature) return false
-    if (f.tag && !(s.themes || []).includes(f.tag)) return false
+    if (f.tag === NO_THEME) { if ((s.themes || []).length) return false }
+    else if (f.tag && !(s.themes || []).includes(f.tag)) return false
     if (f.target && s.target !== f.target) return false
     if (f.trait && !(s.traits || []).includes(f.trait)) return false
     if (f.usage) {

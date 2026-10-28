@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import SheetPhotoButton from './SheetPhotoButton'
-import SongMetaFields from './SongMetaFields'
+import SongMetaFields, { ThemePicker } from './SongMetaFields'
 import { EMPTY_META } from '../utils/songMeta'
 
 const KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
@@ -99,10 +99,14 @@ export default function SongForm({ onCreate }) {
         </select>
       </div>
 
+      <div className="theme-box">
+        <ThemePicker value={form.themes} onChange={(themes) => setForm((prev) => ({ ...prev, themes }))} />
+      </div>
+
       <button type="button" className="secondary toggle-btn" onClick={() => setMetaOpen((v) => !v)}>
-        {metaOpen ? '▲ 분류 접기' : '▼ 분류 (주제·절기·빠르기·대상 등)'}
+        {metaOpen ? '▲ 그 밖의 분류 접기' : '▼ 그 밖의 분류 (빠르기·박자·대상·특성 등)'}
       </button>
-      {metaOpen && <SongMetaFields value={form} onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))} />}
+      {metaOpen && <SongMetaFields hideThemes value={form} onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))} />}
 
       <button type="button" className="secondary toggle-btn" onClick={() => setExpanded((v) => !v)}>
         {expanded ? '▲ 링크·악보 접기' : '▼ 링크·악보 펼치기'}

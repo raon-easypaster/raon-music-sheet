@@ -1,4 +1,4 @@
-import { TEMPOS, TIME_SIGNATURES, TARGETS, TRAITS, THEMES, SEASONS, USAGE_FILTERS, EMPTY_FILTERS, activeFilterCount } from '../utils/songMeta'
+import { TEMPOS, TIME_SIGNATURES, TARGETS, TRAITS, THEMES, SEASONS, USAGE_FILTERS, EMPTY_FILTERS, NO_THEME, activeFilterCount } from '../utils/songMeta'
 
 // 상세 검색 (빠르기·박자·주제·절기·대상·특성·부른 기록). 곡 목록과 곡 선택 창이 함께 쓴다
 export default function SongFilterBar({ filters, onChange, open, onToggle, songs = [] }) {
@@ -28,6 +28,7 @@ export default function SongFilterBar({ filters, onChange, open, onToggle, songs
           </select>
           <select value={filters.tag} onChange={set('tag')} aria-label="주제·절기">
             <option value="">주제·절기 전체</option>
+            <option value={NO_THEME}>주제 없는 곡</option>
             <optgroup label="주제">{THEMES.map((t) => <option key={t} value={t}>{t}</option>)}</optgroup>
             <optgroup label="절기">{SEASONS.map((t) => <option key={t} value={t}>{t}</option>)}</optgroup>
             {otherTags.length > 0 && <optgroup label="직접 넣은 태그">{otherTags.map((t) => <option key={t} value={t}>{t}</option>)}</optgroup>}
