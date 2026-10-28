@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import PublicServiceOrder from '../components/PublicServiceOrder'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { getPublicSetlist, getPublicCurrentSong, setPublicCurrentSong } from '../api/setlists'
 import { COPYRIGHT_NOTICE } from '../utils/copyright'
@@ -18,6 +19,7 @@ export default function PublicSetlistView() {
   const [searchParams] = useSearchParams()
   const [setlist,    setSetlist]    = useState(null)
   const [currentIdx, setCurrentIdx] = useState(0)
+  const [showOrder, setShowOrder] = useState(false)
   const [error,      setError]      = useState('')
   const [loading,    setLoading]    = useState(true)
   const [sheetOnly,     setSheetOnly]     = useState(searchParams.get('view') === 'sheet')
@@ -136,6 +138,11 @@ export default function PublicSetlistView() {
           <p className="muted">{[setlist.gigDate && formatKoreanDate(setlist.gigDate), setlist.name].filter(Boolean).join(' · ')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {setlist.items?.length > 0 && (
+            <button type="button" className="secondary" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => setShowOrder((v) => !v)}>
+              예배 순서
+            </button>
+          )}
           <button
             onClick={() => setSheetOnly(v => !v)}
             style={{
@@ -149,6 +156,10 @@ export default function PublicSetlistView() {
           <span style={{ fontSize: 12, color: '#94a3b8' }}>🔴 실시간 동기화 중</span>
         </div>
       </header>
+
+      {showOrder && (
+        <PublicServiceOrder setlist={setlist} currentIdx={currentIdx} onSelectSong={handleSelectSong} onClose={() => setShowOrder(false)} />
+      )}
 
       {/* 악보만 슬라이드 모드 */}
       {sheetOnly && (

@@ -2,6 +2,7 @@ const Song = require('../models/Song')
 const { resolveWorkspace, accessFilter, isTeamOwner, FORBIDDEN_WORKSPACE } = require('../utils/access')
 
 const User = require('../models/User')
+const { cleanSongMeta, tempoFromBpm } = require('../utils/songMeta')
 
 const SONG_FIELDS = ['title', 'artist', 'key', 'bpm', 'capo', 'youtubeUrl', 'mrUrl', 'sheetImageUrl', 'sheetPdfUrl', 'structure', 'notes']
 
@@ -39,6 +40,8 @@ exports.createSong = async (req, res) => {
 
     const data = { user: req.user._id, team: ws.team ? ws.team._id : null }
     SONG_FIELDS.forEach((f) => { if (req.body[f] !== undefined) data[f] = req.body[f] })
+    Object.assign(data, cleanSongMeta(req.body))
+    if (!data.tempo) data.tempo = tempoFromBpm(data.bpm)
 
     const song = await Song.create(data)
     res.status(201).json(song)
@@ -54,6 +57,8 @@ exports.updateSong = async (req, res) => {
     if (!song) return res.status(404).json({ message: '곡을 찾을 수 없습니다' })
 
     SONG_FIELDS.forEach((f) => { if (req.body[f] !== undefined) song[f] = req.body[f] })
+    Object.assign(song, cleanSongMeta(req.body))
+    if (!song.tempo) song.tempo = tempoFromBpm(song.bpm)
 
     const updated = await song.save()
     res.json(updated)

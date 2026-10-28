@@ -18,6 +18,10 @@ const {
   updateSongSettings,
   setSharePin,
   setCurrentSong,
+  updateItems,
+  getTemplates,
+  createTemplate,
+  deleteTemplate,
 } = require('../controllers/setlistController')
 
 // Public routes (no auth)
@@ -26,6 +30,9 @@ router.get('/public/:token/current', getPublicCurrentSong)
 router.put('/public/:token/current', setPublicCurrentSong)
 
 // Protected routes
+router.get('/templates', protect, getTemplates)
+router.post('/templates', protect, createTemplate)
+router.delete('/templates/:templateId', protect, deleteTemplate)
 router.post('/', protect, createSetlist)
 router.get('/', protect, getSetlists)
 router.put('/:id', protect, updateSetlist)
@@ -38,5 +45,6 @@ router.put('/:id/share-pin', protect, setSharePin)
 router.put('/:id/current', protect, setCurrentSong)
 router.post('/:id/duplicate', protect, duplicateSetlist)
 router.put('/:id/song-settings/:songId', protect, updateSongSettings)
+router.put('/:id/items', protect, updateItems)
 
 module.exports = router

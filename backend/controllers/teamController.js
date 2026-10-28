@@ -1,6 +1,7 @@
 const Team = require('../models/Team')
 const Song = require('../models/Song')
 const Setlist = require('../models/Setlist')
+const ServiceTemplate = require('../models/ServiceTemplate')
 const User = require('../models/User')
 const bcrypt = require('bcryptjs')
 const mongoose = require('mongoose')
@@ -88,6 +89,7 @@ exports.deleteTeam = async (req, res) => {
     // 팀 곡·콘티는 지우지 않고 각각 만든 사람의 개인 공간으로 돌려보낸다
     await Song.updateMany({ team: team._id }, { team: null })
     await Setlist.updateMany({ team: team._id }, { team: null })
+    await ServiceTemplate.updateMany({ team: team._id }, { team: null })
 
     await team.deleteOne()
     res.json({ message: '팀이 삭제되었습니다. 팀 곡·콘티는 각자 만든 사람의 개인 공간으로 옮겨졌습니다' })
@@ -105,6 +107,7 @@ exports.moveMyItemsToTeam = async (req, res) => {
     const mine = { user: req.user._id, team: null }
     const songs = await Song.updateMany(mine, { team: team._id })
     const setlists = await Setlist.updateMany(mine, { team: team._id })
+    await ServiceTemplate.updateMany(mine, { team: team._id })
 
     res.json({
       songs: songs.modifiedCount,

@@ -1,16 +1,19 @@
 import { useState } from 'react'
 import SheetPhotoButton from './SheetPhotoButton'
+import SongMetaFields from './SongMetaFields'
+import { EMPTY_META } from '../utils/songMeta'
 
 const KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
                'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'A#m', 'Bm']
 
-const EMPTY = { title: '', artist: '', key: '', bpm: '', capo: 0, youtubeUrl: '', mrUrl: '', sheetImageUrl: '', sheetPdfUrl: '', structure: '', notes: '' }
+const EMPTY = { title: '', artist: '', key: '', bpm: '', capo: 0, youtubeUrl: '', mrUrl: '', sheetImageUrl: '', sheetPdfUrl: '', structure: '', notes: '', ...EMPTY_META }
 
 export default function SongForm({ onCreate }) {
   const [form, setForm] = useState(EMPTY)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const [metaOpen, setMetaOpen] = useState(false)
 
   function handleChange(e) {
     const { name, value } = e.target
@@ -25,9 +28,11 @@ export default function SongForm({ onCreate }) {
       const payload = { ...form }
       if (payload.bpm) payload.bpm = Number(payload.bpm)
       payload.capo = Number(payload.capo) || 0
+      payload.durationMin = Number(payload.durationMin) || 0
       await onCreate(payload)
       setForm(EMPTY)
       setExpanded(false)
+      setMetaOpen(false)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -93,6 +98,11 @@ export default function SongForm({ onCreate }) {
           {[1,2,3,4,5,6,7].map(n => <option key={n} value={n}>카포 {n}프렛</option>)}
         </select>
       </div>
+
+      <button type="button" className="secondary toggle-btn" onClick={() => setMetaOpen((v) => !v)}>
+        {metaOpen ? '▲ 분류 접기' : '▼ 분류 (주제·절기·빠르기·대상 등)'}
+      </button>
+      {metaOpen && <SongMetaFields value={form} onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))} />}
 
       <button type="button" className="secondary toggle-btn" onClick={() => setExpanded((v) => !v)}>
         {expanded ? '▲ 링크·악보 접기' : '▼ 링크·악보 펼치기'}

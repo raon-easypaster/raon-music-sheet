@@ -20,11 +20,13 @@ export function sortSongs(songs, by) {
   })
 }
 
-// 제목·아티스트·코드 중 하나라도 검색어를 포함하면 보여 준다
+// 제목·아티스트·코드·주제 태그·찬송가 번호·성경구절·작사·작곡 중 하나라도 검색어를 포함하면 보여 준다
 export function filterSongs(songs, search) {
   const q = search.trim().toLowerCase()
   if (!q) return songs
-  return songs.filter((s) => [s.title, s.artist, s.key].some((v) => v?.toLowerCase().includes(q)))
+  return songs.filter((s) =>
+    [s.title, s.artist, s.key, s.hymnNumber, s.scripture, s.lyricist, s.composer, ...(s.themes || [])]
+      .some((v) => v?.toLowerCase().includes(q)))
 }
 
 // Key별 곡 수 → [['C', 3], ['D', 5], ..., ['none', 2]] (Key 순서대로, Key 없는 곡은 맨 뒤 'none')

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { COPYRIGHT_NOTICE } from '../utils/copyright'
 import { formatKoreanDate } from '../utils/dates'
+import { KIND_LABEL, formatMinutes } from '../utils/serviceOrder'
 
 // 용지별 크기(mm)와 한 장에 넣을 수 있는 악보 수 → [가로 칸, 세로 칸]
 const PAPERS = {
@@ -19,7 +20,8 @@ function loadPref() {
   return { paper: 'a4-portrait', split: 2, showList: true }
 }
 
-export default function PrintView({ setlist, songs, onClose }) {
+// order: 예배 순서가 있는 콘티면 [{ kind, title, at, minutes, songData }] (첫 장 순서표에 씀)
+export default function PrintView({ setlist, songs, order = null, totalMinutes = 0, onClose }) {
   const [pref, setPref] = useState(loadPref)
   const [scale, setScale] = useState(1)
   const areaRef = useRef(null)
@@ -79,7 +81,7 @@ export default function PrintView({ setlist, songs, onClose }) {
         </label>
         <label className="print-check">
           <input type="checkbox" checked={pref.showList} onChange={(e) => setOption({ showList: e.target.checked })} />
-          첫 장에 곡 순서
+          첫 장에 {order ? '예배 순서' : '곡 순서'}
         </label>
         <span className="print-actions">
           <button type="button" onClick={() => window.print()}>인쇄 / PDF로 저장</button>
@@ -102,7 +104,25 @@ export default function PrintView({ setlist, songs, onClose }) {
               <span>{p + 1} / {pages.length}</span>
             </header>
 
-            {p === 0 && pref.showList && (
+            {p === 0 && pref.showList && order && (
+              <table className="print-service">
+                <tbody>
+                  {order.map((row) => (
+                    <tr key={row.key} className={`kind-${row.kind}`}>
+                      <td>{row.at}</td>
+                      <td>{KIND_LABEL[row.kind]}</td>
+                      <td>
+                        {row.songData ? <>{row.songData.title}{row.songData.displayKey && <b> · {row.songData.displayKey}</b>}</> : row.title}
+                        {row.note && <small> — {row.note}</small>}
+                      </td>
+                      <td>{row.minutes}분</td>
+                    </tr>
+                  ))}
+                  <tr className="print-service-total"><td colSpan={3}>총 예배 시간{setlist.startTime ? ` (${setlist.startTime} 시작)` : ''}</td><td>{formatMinutes(totalMinutes)}</td></tr>
+                </tbody>
+              </table>
+            )}
+            {p === 0 && pref.showList && !order && (
               <ol className="print-order">
                 {songs.map((s) => (
                   <li key={s._id}>

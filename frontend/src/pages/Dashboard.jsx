@@ -13,6 +13,10 @@ import {
   duplicateSetlist,
   updateSongSettings,
   setSharePin,
+  updateSetlistItems,
+  getTemplates,
+  createTemplate,
+  deleteTemplate,
 } from '../api/setlists'
 import { changePasswordRequest } from '../api/auth'
 import { getMyTeams } from '../api/teams'
@@ -42,6 +46,7 @@ export default function Dashboard() {
 
   const [songs, setSongs] = useState([])
   const [setlists, setSetlists] = useState([])
+  const [templates, setTemplates] = useState([])
   const [selectedSetlistId, setSelectedSetlistId] = useState(null)
   const [loading, setLoading] = useState(true)
   // 처음 한 번만 "불러오는 중"으로 화면을 바꾼다. 저장 후 새로고침 때는 화면(공유 링크 등)을 그대로 둔다
@@ -84,8 +89,13 @@ export default function Dashboard() {
     setError('')
     try {
       const team = workspace || undefined
-      const [songsData, setlistsData] = await Promise.all([getSongs(team), getSetlists(team)])
+      const [songsData, setlistsData, templatesData] = await Promise.all([
+        getSongs(team),
+        getSetlists(team),
+        getTemplates(team).catch(() => []), // 템플릿을 못 불러와도 곡·콘티는 보여 준다
+      ])
       if (loadId !== latestLoad.current) return
+      setTemplates(Array.isArray(templatesData) ? templatesData : [])
       const songsArray = Array.isArray(songsData) ? songsData : songsData.songs || []
       const setlistsArray = Array.isArray(setlistsData) ? setlistsData : setlistsData.setlists || []
 
@@ -133,6 +143,9 @@ export default function Dashboard() {
 
   async function handleShare(setlistId) { return generateShareToken(setlistId) }
   async function handleUpdateSetlist(setlistId, payload) { await updateSetlist(setlistId, payload); await loadData() }
+  async function handleUpdateItems(setlistId, items) { await updateSetlistItems(setlistId, items); await loadData() }
+  async function handleSaveTemplate(setlistId, name) { await createTemplate(setlistId, name); await loadData() }
+  async function handleDeleteTemplate(templateId) { await deleteTemplate(templateId); await loadData() }
   async function handleSongSettings(setlistId, songId, payload) { await updateSongSettings(setlistId, songId, payload); await loadData() }
   async function handleSharePin(setlistId, pin) { const res = await setSharePin(setlistId, pin); await loadData(); return res }
   async function handleDuplicate(setlistId, payload) {
@@ -286,7 +299,7 @@ export default function Dashboard() {
 
           {tab === 1 && (
             <>
-              <SetlistForm onCreate={handleCreateSetlist} />
+              <SetlistForm onCreate={handleCreateSetlist} templates={templates} onDeleteTemplate={handleDeleteTemplate} />
               <div className="conti-grid">
                 <SetlistList
                   setlists={setlists}
@@ -297,6 +310,9 @@ export default function Dashboard() {
                 <SetlistDetail
                   setlist={selectedSetlist}
                   songs={songs}
+                  setlists={setlists}
+                  onUpdateItems={handleUpdateItems}
+                  onSaveTemplate={handleSaveTemplate}
                   onAddSongs={handleAddSongs}
                   onToggleFavorite={handleToggleFavorite}
                   onRemoveSong={handleRemoveSong}

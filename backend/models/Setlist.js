@@ -1,11 +1,22 @@
 const mongoose = require('mongoose')
 
+// 예배 순서 한 줄 (찬양·찬양 자리·기도·말씀·광고·헌금·축도·기타)
+const itemSchema = new mongoose.Schema({
+  kind: { type: String, required: true },
+  song: { type: mongoose.Schema.Types.ObjectId, ref: 'Song', default: null }, // kind가 song일 때
+  title: { type: String, trim: true, default: '' },
+  minutes: { type: Number, default: 0 },
+  note: { type: String, trim: true, default: '' },
+})
+
 const setlistSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     venue: String,
     gigDate: Date,
     notes: String,
+    serviceType: { type: String, trim: true, default: '' }, // 예배 종류 (주일 1부, 청년부 …)
+    startTime: { type: String, trim: true, default: '' },   // 예배 시작 시각 'HH:MM'
 
     // 🔥 THIS WAS MISSING
     songs: [
@@ -14,6 +25,10 @@ const setlistSchema = new mongoose.Schema(
         ref: 'Song',
       },
     ],
+
+    // 예배 순서. 비어 있으면 songs 순서만 있는 예전 콘티로 본다.
+    // 채워져 있으면 곡 순서는 items가 기준이고, songs는 items의 곡을 차례대로 담은 사본이다
+    items: { type: [itemSchema], default: [] },
 
     team: {
       type: mongoose.Schema.Types.ObjectId,
@@ -61,3 +76,4 @@ setlistSchema.set('toJSON', {
 })
 
 module.exports = mongoose.model('Setlist', setlistSchema)
+module.exports.itemSchema = itemSchema

@@ -80,3 +80,21 @@ export function setSharePin(id, pin) {
 export function setCurrentSong(id, index) {
   return apiFetch(`/setlists/${id}/current`, { method: 'PUT', body: JSON.stringify({ index }) })
 }
+
+export function updateSetlistItems(id, items) {
+  return apiFetch(`/setlists/${id}/items`, { method: 'PUT', body: JSON.stringify({ items }) })
+}
+
+const teamQuery = (team) => (team ? `?team=${team}` : '')
+
+export function getTemplates(team) {
+  return apiFetch(`/setlists/templates${teamQuery(team)}`)
+}
+
+export function createTemplate(fromSetlist, name) {
+  return apiFetch('/setlists/templates', { method: 'POST', body: JSON.stringify({ fromSetlist, name }) })
+}
+
+export function deleteTemplate(id) {
+  return apiFetch(`/setlists/templates/${id}`, { method: 'DELETE' })
+}

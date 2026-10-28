@@ -55,6 +55,18 @@ const songSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+
+    // ── 곡 분류 (모두 선택 입력) ──
+    tempo: { type: String, trim: true, default: '' },          // 느림 | 보통 | 빠름 (BPM으로 자동 채움, 바꿀 수 있음)
+    timeSignature: { type: String, trim: true, default: '' },  // 4/4, 3/4, 6/8 …
+    themes: { type: [String], default: [] },                   // 주제·절기 태그
+    target: { type: String, trim: true, default: '' },         // 찬양의 대상
+    traits: { type: [String], default: [] },                   // 곡 특성 (고백, 선포 …)
+    hymnNumber: { type: String, trim: true, default: '' },     // 찬송가 번호
+    scripture: { type: String, trim: true, default: '' },      // 관련 성경구절
+    lyricist: { type: String, trim: true, default: '' },
+    composer: { type: String, trim: true, default: '' },
+    durationMin: { type: Number, default: 0 },                 // 곡 길이(분). 0이면 예배 시간 계산에 4분으로 셈
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

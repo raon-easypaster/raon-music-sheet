@@ -4,6 +4,8 @@ const bcrypt = require('bcryptjs')
 const Setlist = require('../models/Setlist')
 const Song = require('../models/Song')
 const PinAttempt = require('../models/PinAttempt')
+const ServiceTemplate = require('../models/ServiceTemplate')
+const { cleanItems, cleanStartTime, toTemplateItems, syncItemsWithSongs } = require('../utils/serviceOrder')
 const { clientIp } = require('../utils/rateLimit')
 const { resolveWorkspace, accessFilter, canDelete, FORBIDDEN_WORKSPACE } = require('../utils/access')
 
@@ -40,13 +42,26 @@ exports.createSetlist = async (req, res) => {
     if (!ws) return res.status(403).json({ message: FORBIDDEN_WORKSPACE })
 
     const { name, venue, gigDate, notes } = req.body
+    const team = ws.team ? ws.team._id : null
+
+    // 템플릿으로 만들기: 같은 작업 공간의 템플릿만 쓸 수 있다
+    let template = null
+    if (req.body.templateId) {
+      if (!mongoose.isValidObjectId(req.body.templateId)) return res.status(400).json({ message: '템플릿을 찾을 수 없습니다' })
+      template = await ServiceTemplate.findOne({ _id: req.body.templateId, ...(team ? { team } : { user: req.user._id, team: null }) })
+      if (!template) return res.status(404).json({ message: '템플릿을 찾을 수 없습니다' })
+    }
+
     const setlist = await Setlist.create({
       name,
-      venue,
+      venue: venue || template?.venue,
       gigDate,
       notes,
+      serviceType: String(req.body.serviceType ?? template?.serviceType ?? '').trim().slice(0, 30),
+      startTime: cleanStartTime(req.body.startTime || template?.startTime),
+      items: template ? toTemplateItems(template.items) : [],
       user: req.user._id,
-      team: ws.team ? ws.team._id : null,
+      team,
     })
     res.status(201).json(setlist)
   } catch (err) {
@@ -88,6 +103,8 @@ exports.updateSetlist = async (req, res) => {
     setlist.venue = req.body.venue ?? setlist.venue
     setlist.gigDate = req.body.gigDate ?? setlist.gigDate
     setlist.notes = req.body.notes ?? setlist.notes
+    if (req.body.serviceType !== undefined) setlist.serviceType = String(req.body.serviceType).trim().slice(0, 30)
+    if (req.body.startTime !== undefined) setlist.startTime = cleanStartTime(req.body.startTime)
 
     const updatedSetlist = await setlist.save()
     res.json(updatedSetlist)
@@ -116,6 +133,7 @@ exports.addSongsToSetlist = async (req, res) => {
     const toAdd = allowed.filter(id => !existing.includes(String(id)))
 
     setlist.songs.push(...toAdd)
+    syncItemsWithSongs(setlist)
 
     await setlist.save()
 
@@ -157,6 +175,7 @@ exports.reorderSongs = async (req, res) => {
     if (!setlist) return res.status(404).json({ message: 'Setlist not found' })
 
     setlist.songs = await sameWorkspaceSongIds(setlist, songIds)
+    syncItemsWithSongs(setlist)
     await setlist.save()
     res.json(await populateSetlist(setlist._id))
   } catch (err) {
@@ -256,6 +275,16 @@ exports.getPublicSetlist = async (req, res) => {
     res.json({
       name: setlist.name,
       gigDate: setlist.gigDate || null,
+      serviceType: setlist.serviceType || '',
+      startTime: setlist.startTime || '',
+      // 예배 순서 (곡 항목은 songs의 위치로 알려 준다)
+      items: (setlist.items || []).map((it) => ({
+        kind: it.kind,
+        title: it.title,
+        minutes: it.minutes,
+        note: it.note,
+        songIndex: it.kind === 'song' ? setlist.songs.findIndex((s) => s._id.equals(it.song)) : -1,
+      })),
       songs: setlist.songs.map(s => {
         const own = settings.get(s._id.toString())
         return {
@@ -269,6 +298,7 @@ exports.getPublicSetlist = async (req, res) => {
           sheetImageUrl: s.sheetImageUrl,
           sheetPdfUrl: s.sheetPdfUrl,
           structure: s.structure,
+          durationMin: s.durationMin || 0,
           notes: [own?.notes, s.notes].filter(Boolean).join('\n'),
         }
       })
@@ -328,6 +358,7 @@ exports.removeSongFromSetlist = async (req, res) => {
     setlist.songSettings = (setlist.songSettings || []).filter(
       (s) => s.song.toString() !== songId.toString()
     )
+    syncItemsWithSongs(setlist)
 
     await setlist.save()
 
@@ -350,6 +381,9 @@ exports.duplicateSetlist = async (req, res) => {
       notes: source.notes,
       songs: source.songs,
       songSettings: source.songSettings,
+      serviceType: source.serviceType,
+      startTime: source.startTime,
+      items: source.items,
       team: source.team,
       user: req.user._id,
     })
@@ -416,6 +450,89 @@ exports.setCurrentSong = async (req, res) => {
     setlist.currentSongIdx = index
     await setlist.save()
     res.json({ index })
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}
+
+// PUT /setlists/:id/items  { items: [...] } — 예배 순서 전체 저장 (곡 순서도 이것을 따른다)
+exports.updateItems = async (req, res) => {
+  try {
+    const setlist = await findAccessibleSetlist(req)
+    if (!setlist) return res.status(404).json({ message: 'Setlist not found' })
+    if (!Array.isArray(req.body.items)) return res.status(400).json({ message: 'items must be an array' })
+
+    const requested = req.body.items.filter((it) => it?.kind === 'song').map((it) => String(it.song?._id || it.song || ''))
+    const allowed = await sameWorkspaceSongIds(setlist, requested)
+    const items = cleanItems(req.body.items, allowed)
+
+    setlist.items = items
+    setlist.songs = items.filter((it) => it.kind === 'song').map((it) => it.song)
+    const kept = new Set(setlist.songs.map(String))
+    setlist.songSettings = (setlist.songSettings || []).filter((s) => kept.has(s.song.toString()))
+    await setlist.save()
+    res.json(await populateSetlist(setlist._id))
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}
+
+// ── 예배 템플릿 ──
+const templateScope = (ws, user) => (ws.team ? { team: ws.team._id } : { user: user._id, team: null })
+
+// GET /setlists/templates?team=
+exports.getTemplates = async (req, res) => {
+  try {
+    const ws = await resolveWorkspace(req.user, req.query.team)
+    if (!ws) return res.status(403).json({ message: FORBIDDEN_WORKSPACE })
+    res.json(await ServiceTemplate.find(templateScope(ws, req.user)).sort({ serviceType: 1, name: 1 }).limit(100))
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}
+
+// POST /setlists/templates  { fromSetlist, name } — 콘티의 순서를 템플릿으로 저장
+exports.createTemplate = async (req, res) => {
+  try {
+    req.params.id = req.body.fromSetlist
+    const setlist = await findAccessibleSetlist(req)
+    if (!setlist) return res.status(404).json({ message: 'Setlist not found' })
+    const name = String(req.body.name || '').trim().slice(0, 40)
+    if (!name) return res.status(400).json({ message: '템플릿 이름을 넣어 주세요' })
+
+    // 순서를 아직 안 짠 콘티는 곡 수만큼 '찬양 자리'를 만든다
+    const items = setlist.items.length
+      ? setlist.items
+      : setlist.songs.map(() => ({ kind: 'slot', title: '', minutes: 0, note: '' }))
+    const scope = setlist.team ? { team: setlist.team } : { user: req.user._id, team: null }
+    if ((await ServiceTemplate.countDocuments(scope)) >= 100) {
+      return res.status(400).json({ message: '템플릿은 100개까지 저장할 수 있습니다' })
+    }
+
+    const template = await ServiceTemplate.create({
+      name,
+      serviceType: setlist.serviceType,
+      startTime: setlist.startTime,
+      venue: setlist.venue || '',
+      items: toTemplateItems(items),
+      team: setlist.team || null,
+      user: req.user._id,
+    })
+    res.status(201).json(template)
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}
+
+// DELETE /setlists/templates/:templateId — 만든 사람 또는 팀장
+exports.deleteTemplate = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.templateId)) return res.status(404).json({ message: '템플릿을 찾을 수 없습니다' })
+    const template = await ServiceTemplate.findOne({ _id: req.params.templateId, ...(await accessFilter(req.user)) })
+    if (!template) return res.status(404).json({ message: '템플릿을 찾을 수 없습니다' })
+    if (!(await canDelete(req.user, template))) return res.status(403).json({ message: '만든 사람이나 팀장만 지울 수 있습니다' })
+    await template.deleteOne()
+    res.json({ message: '템플릿을 지웠습니다' })
   } catch (err) {
     res.status(500).json({ message: err.message })
   }

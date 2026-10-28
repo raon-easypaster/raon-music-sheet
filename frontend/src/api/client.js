@@ -9,8 +9,9 @@ export function getToken() {
   return localStorage.getItem('token')
 }
 
-export async function apiFetch(endpoint, options = {}) {
-  const token = getToken()
+export async function apiFetch(endpoint, { skipAuth, ...options } = {}) {
+  // 공유 화면 요청(skipAuth)에는 로그인 정보를 싣지 않는다 → 오프라인 저장본도 쓸 수 있다
+  const token = skipAuth ? null : getToken()
 
   const headers = {
     'Content-Type': 'application/json',

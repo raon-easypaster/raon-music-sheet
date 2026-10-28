@@ -2,8 +2,11 @@ import { useMemo, useState } from 'react'
 import SongViewer from './SongViewer'
 import FavoriteStar from './FavoriteStar'
 import SheetPhotoButton from './SheetPhotoButton'
+import SongMetaFields from './SongMetaFields'
+import SongFilterBar from './SongFilterBar'
 import { exportSongsCsv, exportBackupJson } from '../utils/exporters'
-import { formatKoreanDate, isoToDateInput, toDateInput } from '../utils/dates'
+import { formatKoreanDate } from '../utils/dates'
+import { metaFormValues, usageStats, usageText, applyMetaFilters, sortByUsage, EMPTY_FILTERS, tempoFromBpm } from '../utils/songMeta'
 import { sortSongs, filterSongs, countByKey, filterByKey } from '../utils/songSort'
 
 const KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
@@ -15,6 +18,8 @@ const SORT_OPTIONS = [
   { value: 'artist',  label: '아티스트순' },
   { value: 'key',     label: '코드순' },
   { value: 'bpm',     label: 'BPM순' },
+  { value: 'most',    label: '많이 부른 순' },
+  { value: 'stale',   label: '오래 안 부른 순' },
 ]
 
 export default function SongList({ songs, setlists = [], workspaceLabel = '개인', showOwner, canDelete = true, onDelete, onUpdate, onToggleFavorite }) {
@@ -28,6 +33,9 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
   const [sortBy,       setSortBy]       = useState('default')
   const [favOnly,      setFavOnly]      = useState(false)
   const [keyFilter,    setKeyFilter]    = useState('') // '' = 전체, 'none' = Key 없는 곡
+  const [filters,      setFilters]      = useState(EMPTY_FILTERS)
+  const [filterOpen,   setFilterOpen]   = useState(false)
+  const [metaOpen,     setMetaOpen]     = useState(false)
 
   function openEdit(song) {
     setEditing(song)
@@ -43,8 +51,10 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
       sheetPdfUrl:   song.sheetPdfUrl   || '',
       structure:     song.structure     || '',
       notes:         song.notes         || '',
+      ...metaFormValues(song),
     })
     setEditExpanded(false)
+    setMetaOpen(false)
     setEditError('')
   }
 
@@ -58,6 +68,7 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
       const payload = { ...editForm }
       if (payload.bpm) payload.bpm = Number(payload.bpm)
       payload.capo = Number(payload.capo) || 0
+      payload.durationMin = Number(payload.durationMin) || 0
       await onUpdate(editing._id, payload)
       closeEdit()
     } catch (err) {
@@ -71,29 +82,17 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
     return e => setEditForm(f => ({ ...f, [field]: e.target.value }))
   }
 
-  // 곡마다 마지막으로 부른 날 (오늘까지의 콘티 날짜 중 가장 최근)
-  const lastSung = useMemo(() => {
-    const today = toDateInput(new Date())
-    const map = new Map()
-    for (const sl of setlists) {
-      const date = isoToDateInput(sl.gigDate)
-      if (!date || date > today) continue
-      for (const s of sl.songs || []) {
-        const id = typeof s === 'string' ? s : s._id
-        if (!map.has(id) || map.get(id) < date) map.set(id, date)
-      }
-    }
-    return map
-  }, [setlists])
+  // 곡마다 부른 횟수·마지막으로 부른 날 (오늘까지의 콘티 날짜 기준)
+  const usage = useMemo(() => usageStats(setlists), [setlists])
 
-  // 검색·즐겨찾기 → (Key별 곡 수 계산) → Key 선택 순서로 거른다
-  const searched = filterSongs(songs, search)
+  // 검색·상세 검색·즐겨찾기 → (Key별 곡 수 계산) → Key 선택 순서로 거른다
+  const searched = applyMetaFilters(filterSongs(songs, search), filters, usage)
   const favCount = searched.filter((s) => s.isFavorite).length
   const base = favOnly ? searched.filter((s) => s.isFavorite) : searched
   const keyCounts = countByKey(base)
   const filtered = filterByKey(base, keyFilter)
-  const sorted = sortSongs(filtered, sortBy)
-  const isFiltered = !!(search || favOnly || keyFilter)
+  const sorted = sortBy === 'most' || sortBy === 'stale' ? sortByUsage(filtered, usage, sortBy) : sortSongs(filtered, sortBy)
+  const isFiltered = !!(search || favOnly || keyFilter || Object.values(filters).some(Boolean))
 
   return (
     <>
@@ -115,7 +114,7 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
             </button>
             <input
               type="search"
-              placeholder="제목·아티스트·코드 검색"
+              placeholder="제목·아티스트·코드·태그 검색"
               value={search}
               onChange={e => setSearch(e.target.value)}
               style={{ padding: '7px 12px', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 13, width: 190 }}
@@ -137,6 +136,10 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
             </button>
           </div>
         </div>
+
+        {songs.length > 0 && (
+          <SongFilterBar filters={filters} onChange={setFilters} open={filterOpen} onToggle={() => setFilterOpen((v) => !v)} songs={songs} />
+        )}
 
         {songs.length > 0 && (
           <div className="key-chips" role="group" aria-label="Key별 곡 수">
@@ -164,7 +167,8 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
 
         {sorted.length === 0 && (
           <p className="muted">
-            {keyFilter && !search ? '이 코드의 곡이 없습니다'
+            {Object.values(filters).some(Boolean) ? '상세 검색 조건에 맞는 곡이 없습니다'
+              : keyFilter && !search ? '이 코드의 곡이 없습니다'
               : search ? `"${search}" 검색 결과가 없습니다`
               : favOnly ? '즐겨찾기한 곡이 없습니다. 곡 제목 옆 ☆를 눌러 추가하세요'
               : '등록된 곡이 없습니다'}
@@ -179,9 +183,10 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
                 <strong>{song.title}</strong>
               </span>
               <span className="muted">{song.artist}</span>
-              {lastSung.get(song._id) && (
-                <span className="muted" style={{ fontSize: 12 }}>마지막으로 부른 날: {formatKoreanDate(lastSung.get(song._id))}</span>
-              )}
+              <span className="muted usage-line">
+                {usageText(usage.get(song._id))}
+                {usage.get(song._id) && ` · 마지막 ${formatKoreanDate(usage.get(song._id).last)}`}
+              </span>
               {showOwner && song.user?.email && (
                 <span className="muted" style={{ fontSize: 12 }}>등록: {song.user.email}</span>
               )}
@@ -189,6 +194,11 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
                 {song.key           && <span className="badge badge-key">{song.key}</span>}
                 {song.capo > 0      && <span className="badge" style={{ background: '#fef9c3', color: '#854d0e' }}>카포 {song.capo}</span>}
                 {song.bpm > 0       && <span className="badge badge-bpm">{song.bpm} BPM</span>}
+                {(song.tempo || tempoFromBpm(song.bpm)) && <span className="badge badge-meta">{song.tempo || tempoFromBpm(song.bpm)}</span>}
+                {song.timeSignature && <span className="badge badge-meta">{song.timeSignature}</span>}
+                {song.target        && <span className="badge badge-meta">{song.target}</span>}
+                {(song.themes || []).slice(0, 4).map((t) => <span key={t} className="badge badge-tag">#{t}</span>)}
+                {song.hymnNumber    && <span className="badge badge-meta">{song.hymnNumber}</span>}
                 {song.youtubeUrl    && <span className="badge badge-link">YT</span>}
                 {song.sheetImageUrl && <span className="badge badge-link">악보</span>}
                 {song.sheetPdfUrl   && <span className="badge badge-link">PDF</span>}
@@ -232,6 +242,11 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
                   {[1,2,3,4,5,6,7].map(n => <option key={n} value={n}>카포 {n}프렛</option>)}
                 </select>
               </div>
+
+              <button type="button" className="secondary toggle-btn" onClick={() => setMetaOpen(v => !v)}>
+                {metaOpen ? '▲ 분류 접기' : '▼ 분류 (주제·절기·빠르기·대상 등)'}
+              </button>
+              {metaOpen && <SongMetaFields value={editForm} onChange={(patch) => setEditForm((f) => ({ ...f, ...patch }))} />}
 
               <button type="button" className="secondary toggle-btn" onClick={() => setEditExpanded(v => !v)}>
                 {editExpanded ? '▲ 링크·악보 접기' : '▼ 링크·악보 펼치기'}

@@ -604,3 +604,96 @@ button:hover {
 .song-shown { display: inline-block; margin-left: 6px; font-size: 13px; font-weight: 400; color: #64748b; vertical-align: middle; }
 .tab-count { margin-left: 6px; padding: 0 7px; border-radius: 999px; background: rgba(255, 255, 255, .25); font-size: 12px; font-weight: 700; }
 .tab-btn.active .tab-count { background: #dcfce7; color: #15803d; }
+
+/* ── 곡 분류 입력 ── */
+.meta-fields { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line, #e2e8f0); border-radius: 12px; background: var(--surface-2, #f8fafc); margin-bottom: 8px; }
+.meta-label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--ink-2, #475569); flex: 1; }
+.meta-fields .row-fields { margin: 0; }
+.tag-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tag-chips button { padding: 4px 10px; font-size: 12px; border-radius: 999px; border: 1px solid var(--line, #e2e8f0); background: var(--surface, #fff); color: var(--ink-2, #475569); font-weight: 500; }
+.tag-chips button.on { background: var(--brand, #14532d); border-color: var(--brand, #14532d); color: #fff; }
+.tag-chips.season button.on { background: var(--gold, #b8893b); border-color: var(--gold, #b8893b); }
+.tag-input { flex: 1; min-width: 160px; margin: 0 !important; padding: 5px 10px !important; font-size: 12px !important; }
+
+/* ── 상세 검색 ── */
+.filter-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.filter-toggle, .filter-clear { padding: 6px 12px; font-size: 13px; border-radius: 10px; border: 1px solid var(--line, #e2e8f0); background: var(--surface, #fff); color: var(--ink, #1e293b); font-weight: 600; }
+.filter-toggle.on { border-color: var(--brand, #14532d); color: var(--brand, #14532d); background: var(--brand-soft, #f0fdf4); }
+.filter-clear { font-weight: 500; color: var(--ink-3, #64748b); }
+.filter-grid { flex-basis: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.filter-grid select { margin: 0; padding: 7px 10px; font-size: 13px; }
+.usage-line { font-size: 12px; }
+.badge-meta { background: var(--surface-2, #f1f5f9); color: var(--ink-2, #475569); }
+.badge-tag { background: var(--gold-soft, #fbf3e4); color: var(--gold-ink, #7a5a1f); }
+.badge-new { background: #fff1f2; color: #be123c; }
+
+/* ── 콘티 점검 ── */
+.check-box { border: 1px solid #f5d9a8; background: #fffaf0; border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; font-size: 13px; color: #7a4b00; }
+.check-box ul { margin: 6px 0; padding-left: 18px; }
+.check-box li { margin: 2px 0; }
+.ok-text { color: var(--brand, #15803d); font-size: 13px; margin: 0 0 10px; }
+
+/* ── 예배 순서 ── */
+.hint { font-size: 12px; color: var(--ink-3, #94a3b8); font-weight: 400; }
+.time-summary { font-size: 13px; color: var(--ink-2, #475569); background: var(--surface-2, #f8fafc); border-radius: 10px; padding: 8px 12px; margin-bottom: 8px; }
+.order-row { border-left: 4px solid transparent; flex-direction: column; align-items: stretch !important; }
+.order-row.kind-song { border-left-color: var(--brand, #14532d); }
+.order-row.kind-slot { border-left-color: #86b59a; border-style: dashed; background: #f7fbf8; }
+.order-row.kind-prayer { border-left-color: #3b6ea8; background: #f5f8fc; }
+.order-row.kind-word { border-left-color: #7c2d3a; background: #fbf6f7; }
+.order-row.kind-announce { border-left-color: #c2410c; background: #fff8f3; }
+.order-row.kind-offering { border-left-color: var(--gold, #b8893b); background: #fdf9f1; }
+.order-row.kind-blessing { border-left-color: #0f766e; background: #f3faf9; }
+.order-row.kind-other { border-left-color: #94a3b8; background: #f8fafc; }
+.order-time { display: flex; flex-direction: column; align-items: flex-end; min-width: 44px; flex-shrink: 0; font-size: 11px; color: var(--ink-3, #94a3b8); font-variant-numeric: tabular-nums; }
+.order-time b { color: var(--ink, #1e293b); font-size: 12px; }
+.order-item-info { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.kind-tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; color: #fff; background: #94a3b8; flex-shrink: 0; }
+.kind-tag-song { background: var(--brand, #14532d); }
+.kind-tag-slot { background: #86b59a; }
+.kind-tag-prayer { background: #3b6ea8; }
+.kind-tag-word { background: #7c2d3a; }
+.kind-tag-announce { background: #c2410c; }
+.kind-tag-offering { background: var(--gold, #b8893b); }
+.kind-tag-blessing { background: #0f766e; }
+.row-move, .row-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.row-move button { padding: 3px 7px; font-size: 10px; }
+.row-actions button { font-size: 12px; padding: 5px 9px; }
+.row-edit { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; padding: 10px; background: var(--surface, #fff); border: 1px solid var(--line, #e2e8f0); border-radius: 10px; cursor: default; }
+.row-edit input, .row-edit select { margin: 0; flex: 1; min-width: 120px; }
+.row-edit label { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.row-edit label input { width: 80px; min-width: 0; flex: none; }
+.add-item { margin-bottom: 8px; }
+.add-item input[type="number"] { flex: none; width: 80px; min-width: 0; }
+.add-item-btn { width: 100%; border-style: dashed !important; margin-bottom: 8px; }
+.setlist-type { display: inline-block; font-size: 11px; font-weight: 700; color: var(--gold-ink, #7a5a1f); background: var(--gold-soft, #fbf3e4); border-radius: 999px; padding: 1px 8px; margin-right: 6px; }
+.type-input { width: 130px; }
+.template-manage { margin-top: 10px; font-size: 13px; }
+.template-manage ul { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.template-manage li { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--line, #e2e8f0); border-radius: 10px; }
+.template-manage li > span { display: flex; flex-direction: column; min-width: 0; }
+.template-items { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link-btn { background: none !important; border: none !important; color: var(--brand, #14532d) !important; padding: 0 !important; font-weight: 600; text-decoration: underline; cursor: pointer; }
+
+/* 인쇄 첫 장의 예배 순서표 */
+.print-service { width: 100%; border-collapse: collapse; font-size: 10pt; margin: 0 0 4mm; }
+.print-service td { padding: 1.2mm 2mm; border-bottom: 0.2mm solid #ddd; }
+.print-service td:first-child, .print-service td:last-child { white-space: nowrap; width: 1%; font-variant-numeric: tabular-nums; }
+.print-service td:nth-child(2) { white-space: nowrap; width: 1%; font-weight: 700; }
+.print-service .kind-song td:nth-child(2) { color: #14532d; }
+.print-service-total td { font-weight: 700; border-bottom: none; }
+
+/* 공유 화면 예배 순서 */
+.public-order { background: var(--surface, #fff); border-bottom: 1px solid var(--line, #e2e8f0); padding: 12px 16px; max-height: 60vh; overflow-y: auto; }
+.public-order-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; font-size: 13px; }
+.public-order-head span { color: var(--ink-3, #64748b); flex: 1; }
+.public-order ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.public-order li { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 8px; font-size: 14px; }
+.public-order li.current { outline: 2px solid var(--brand, #14532d); }
+.public-order-title { flex: 1; min-width: 0; }
+
+@media (max-width: 640px) {
+  .order-row .setlist-song-inner { flex-wrap: wrap; }
+  .row-actions { flex-basis: 100%; justify-content: flex-end; }
+  .type-input { width: 110px; }
+}
