@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import PublicServiceOrder from '../components/PublicServiceOrder'
+import Icon from '../components/Icon'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { getPublicSetlist, getPublicCurrentSong, setPublicCurrentSong } from '../api/setlists'
 import { COPYRIGHT_NOTICE } from '../utils/copyright'
@@ -21,6 +22,14 @@ export default function PublicSetlistView() {
   const [setlist,    setSetlist]    = useState(null)
   const [currentIdx, setCurrentIdx] = useState(0)
   const [showOrder, setShowOrder] = useState(false)
+  // 무대 모드: 어두운 예배당에서 눈부시지 않게 검은 바탕으로 (이 기기에 기억)
+  const [stage, setStage] = useState(() => { try { return localStorage.getItem('stageMode') === '1' } catch { return false } })
+  function toggleStage() {
+    setStage((v) => {
+      try { localStorage.setItem('stageMode', v ? '0' : '1') } catch { /* 기억 못 해도 지금 화면에는 적용 */ }
+      return !v
+    })
+  }
   const [error,      setError]      = useState('')
   const [loading,    setLoading]    = useState(true)
   const [sheetOnly,     setSheetOnly]     = useState(searchParams.get('view') === 'sheet')
@@ -131,7 +140,7 @@ export default function PublicSetlistView() {
   const song  = songs[currentIdx] || songs[0]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', background: 'var(--bg, #f8fafc)' }}>
+    <div className={stage ? 'stage-mode' : undefined} style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', background: 'var(--bg, #f8fafc)' }}>
       {/* 헤더 */}
       <header className="topbar" style={{ flexShrink: 0 }}>
         <div>
@@ -139,6 +148,10 @@ export default function PublicSetlistView() {
           <p className="muted">{[setlist.gigDate && formatKoreanDate(setlist.gigDate), setlist.name].filter(Boolean).join(' · ')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button type="button" className="secondary" style={{ fontSize: 12, padding: '5px 10px' }} onClick={toggleStage}
+            aria-pressed={stage} title={stage ? '밝은 화면으로' : '어두운 무대 모드로'}>
+            <Icon name={stage ? 'sun' : 'moon'} />{stage ? '밝게' : '무대 모드'}
+          </button>
           {setlist.items?.length > 0 && (
             <button type="button" className="secondary" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => setShowOrder((v) => !v)}>
               예배 순서
