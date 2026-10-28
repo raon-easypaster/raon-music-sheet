@@ -26,6 +26,7 @@ import HelpPage from '../components/HelpPage'
 import PracticeTools from '../components/PracticeTools'
 
 const TABS = ['곡 목록', '콘티', '팀', '연습 도구', '사용법']
+const TAB_COUNTED = { 0: 'songs', 1: 'setlists' } // 곡 목록·콘티 탭에는 개수를 함께 보여 준다
 const WORKSPACE_KEY = 'workspace'
 
 function loadSavedWorkspace() {
@@ -256,6 +257,9 @@ export default function Dashboard() {
             onClick={() => setTab(i)}
           >
             {name}
+            {TAB_COUNTED[i] && !loading && (
+              <span className="tab-count">{TAB_COUNTED[i] === 'songs' ? songs.length : setlists.length}</span>
+            )}
           </button>
         ))}
       </nav>

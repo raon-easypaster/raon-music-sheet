@@ -26,3 +26,21 @@ export function filterSongs(songs, search) {
   if (!q) return songs
   return songs.filter((s) => [s.title, s.artist, s.key].some((v) => v?.toLowerCase().includes(q)))
 }
+
+// Key별 곡 수 → [['C', 3], ['D', 5], ..., ['none', 2]] (Key 순서대로, Key 없는 곡은 맨 뒤 'none')
+export function countByKey(songs) {
+  const counts = new Map()
+  for (const song of songs) {
+    const key = song.key || ''
+    counts.set(key, (counts.get(key) || 0) + 1)
+  }
+  const known = KEY_ORDER.filter((k) => counts.has(k)).map((k) => [k, counts.get(k)])
+  const others = [...counts].filter(([k]) => k && !KEY_ORDER.includes(k))
+  return counts.has('') ? [...known, ...others, ['none', counts.get('')]] : [...known, ...others]
+}
+
+// countByKey의 Key 값으로 곡 거르기 ('' = 전체, 'none' = Key 없는 곡)
+export function filterByKey(songs, key) {
+  if (!key) return songs
+  return songs.filter((s) => (key === 'none' ? !s.key : s.key === key))
+}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { getPublicCurrentSong, setCurrentSong } from '../api/setlists'
-import { sortSongs, filterSongs, KEY_ORDER } from '../utils/songSort'
+import { sortSongs, filterSongs, countByKey, filterByKey, KEY_ORDER } from '../utils/songSort'
 import FavoriteStar from './FavoriteStar'
 import PrintView from './PrintView'
 import { formatKoreanDate, isoToDateInput, addDays, nextSunday } from '../utils/dates'
@@ -129,23 +129,10 @@ export default function SetlistDetail({
     return pickerFavOnly ? searched.filter((s) => s.isFavorite) : searched
   }, [availableSongs, pickerSearch, pickerFavOnly])
 
-  const pickerKeyCounts = useMemo(() => {
-    const counts = new Map()
-    for (const song of pickerBase) {
-      const key = song.key || ''
-      counts.set(key, (counts.get(key) || 0) + 1)
-    }
-    const known = KEY_ORDER.filter((k) => counts.has(k)).map((k) => [k, counts.get(k)])
-    const others = [...counts].filter(([k]) => k && !KEY_ORDER.includes(k))
-    const none = counts.has('') ? [['', counts.get('')]] : []
-    return [...known, ...others, ...none.map(([, n]) => ['none', n])]
-  }, [pickerBase])
+  const pickerKeyCounts = useMemo(() => countByKey(pickerBase), [pickerBase])
 
   const pickerSongs = useMemo(() => {
-    let list = pickerBase
-    if (pickerSort === 'key' && pickerKey) {
-      list = list.filter((song) => (pickerKey === 'none' ? !song.key : song.key === pickerKey))
-    }
+    const list = pickerSort === 'key' ? filterByKey(pickerBase, pickerKey) : pickerBase
     return sortSongs(list, pickerSort)
   }, [pickerBase, pickerSort, pickerKey])
 

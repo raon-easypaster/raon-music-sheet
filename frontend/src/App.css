@@ -223,6 +223,8 @@ button:hover {
   padding: 8px 20px;
   border-radius: 20px;
   font-size: 14px;
+  white-space: nowrap;
+  flex: none;
 }
 
 .tab-btn.active {
@@ -492,6 +494,10 @@ button:hover {
 }
 
 @media (max-width: 600px) {
+  /* 휴대폰: 탭이 넘치면 글자를 쪼개지 않고 옆으로 밀어서 보게 한다 */
+  .tab-nav { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+  .tab-nav::-webkit-scrollbar { display: none; }
+  .tab-btn { padding: 8px 14px; }
   /* 휴대폰: 곡 정보는 한 줄 전체를 쓰고, 보기·수정·삭제 버튼은 그 아래로 */
   .song-row { flex-direction: column; gap: 8px; }
   .song-row .song-actions { width: 100%; }
@@ -592,3 +598,9 @@ button:hover {
 .account-help-result.no { background: #fef2f2; color: #991b1b; }
 .account-help-note { font-size: 13px; }
 .account-help > .link-button { align-self: flex-start; }
+
+/* ===== 곡 수 표시 ===== */
+.song-total { display: inline-block; margin-left: 8px; padding: 2px 10px; border-radius: 999px; background: #dcfce7; color: #15803d; font-size: 14px; font-weight: 700; vertical-align: middle; }
+.song-shown { display: inline-block; margin-left: 6px; font-size: 13px; font-weight: 400; color: #64748b; vertical-align: middle; }
+.tab-count { margin-left: 6px; padding: 0 7px; border-radius: 999px; background: rgba(255, 255, 255, .25); font-size: 12px; font-weight: 700; }
+.tab-btn.active .tab-count { background: #dcfce7; color: #15803d; }

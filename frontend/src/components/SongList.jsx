@@ -4,7 +4,7 @@ import FavoriteStar from './FavoriteStar'
 import SheetPhotoButton from './SheetPhotoButton'
 import { exportSongsCsv, exportBackupJson } from '../utils/exporters'
 import { formatKoreanDate, isoToDateInput, toDateInput } from '../utils/dates'
-import { sortSongs, filterSongs } from '../utils/songSort'
+import { sortSongs, filterSongs, countByKey, filterByKey } from '../utils/songSort'
 
 const KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
                'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'A#m', 'Bm']
@@ -27,6 +27,7 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
   const [search,       setSearch]       = useState('')
   const [sortBy,       setSortBy]       = useState('default')
   const [favOnly,      setFavOnly]      = useState(false)
+  const [keyFilter,    setKeyFilter]    = useState('') // '' = 전체, 'none' = Key 없는 곡
 
   function openEdit(song) {
     setEditing(song)
@@ -85,9 +86,14 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
     return map
   }, [setlists])
 
+  // 검색·즐겨찾기 → (Key별 곡 수 계산) → Key 선택 순서로 거른다
   const searched = filterSongs(songs, search)
-  const filtered = favOnly ? searched.filter((s) => s.isFavorite) : searched
+  const favCount = searched.filter((s) => s.isFavorite).length
+  const base = favOnly ? searched.filter((s) => s.isFavorite) : searched
+  const keyCounts = countByKey(base)
+  const filtered = filterByKey(base, keyFilter)
   const sorted = sortSongs(filtered, sortBy)
+  const isFiltered = !!(search || favOnly || keyFilter)
 
   return (
     <>
@@ -95,9 +101,8 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
           <h2 style={{ margin: 0 }}>
             전체 곡 목록
-            <span className="muted" style={{ fontSize: 14, fontWeight: 400, marginLeft: 6 }}>
-              ({search || favOnly ? `${filtered.length}/` : ''}{songs.length}곡)
-            </span>
+            <span className="song-total">총 {songs.length}곡</span>
+            {isFiltered && <span className="song-shown">지금 보이는 곡 {filtered.length}곡</span>}
           </h2>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button
@@ -106,7 +111,7 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
               aria-pressed={favOnly}
               onClick={() => setFavOnly((v) => !v)}
             >
-              ★ 즐겨찾기만
+              ★ 즐겨찾기 ({favCount})
             </button>
             <input
               type="search"
@@ -133,9 +138,34 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
           </div>
         </div>
 
+        {songs.length > 0 && (
+          <div className="key-chips" role="group" aria-label="Key별 곡 수">
+            <button
+              type="button"
+              className={keyFilter === '' ? 'active' : ''}
+              aria-pressed={keyFilter === ''}
+              onClick={() => setKeyFilter('')}
+            >
+              전체 <span className="chip-count">{base.length}</span>
+            </button>
+            {keyCounts.map(([key, count]) => (
+              <button
+                key={key}
+                type="button"
+                className={keyFilter === key ? 'active' : ''}
+                aria-pressed={keyFilter === key}
+                onClick={() => setKeyFilter(keyFilter === key ? '' : key)}
+              >
+                {key === 'none' ? '코드 없음' : key} <span className="chip-count">{count}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {sorted.length === 0 && (
           <p className="muted">
-            {search ? `"${search}" 검색 결과가 없습니다`
+            {keyFilter && !search ? '이 코드의 곡이 없습니다'
+              : search ? `"${search}" 검색 결과가 없습니다`
               : favOnly ? '즐겨찾기한 곡이 없습니다. 곡 제목 옆 ☆를 눌러 추가하세요'
               : '등록된 곡이 없습니다'}
           </p>
