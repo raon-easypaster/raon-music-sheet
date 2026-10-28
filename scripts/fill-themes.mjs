@@ -114,7 +114,12 @@ async function apply() {
     plan.push({ song, patch })
   }
 
-  console.log(`\n${ws.label} 공간에 주제를 넣을 곡: ${plan.length}곡`)
+  // 결과를 파일로도 남긴다 (나중에 확인용)
+  const log = { at: new Date().toISOString(), workspace: ws.label, total: current.size, alreadyHadThemes: [...current.values()].filter((s) => !empty(s.themes)).length, toSave: plan.length, saved: 0, failed: [] }
+  const writeLog = () => fs.writeFileSync(path.join(WORK, 'themes-applied.json'), JSON.stringify(log, null, 2))
+  writeLog()
+  console.log(`\n${ws.label} 공간: 전체 ${current.size}곡 중 이미 주제가 있는 곡 ${log.alreadyHadThemes}곡`)
+  console.log(`주제를 넣을 곡: ${plan.length}곡`)
   plan.slice(0, 10).forEach(({ song, patch }) => console.log(`  ${song.title} → ${patch.themes.join(', ')}`))
   if (plan.length > 10) console.log(`  … 외 ${plan.length - 10}곡`)
   if (!plan.length) return
@@ -123,8 +128,10 @@ async function apply() {
   let ok = 0
   for (const { song, patch } of plan) {
     try { await call('PUT', `/songs/${song._id}`, token, patch); ok++ }
-    catch (err) { console.log(`  실패: ${song.title} — ${err.message}`) }
+    catch (err) { console.log(`  실패: ${song.title} — ${err.message}`); log.failed.push(song.title) }
   }
+  log.saved = ok
+  writeLog()
   console.log(`\n${ok}곡에 주제를 넣었습니다.`)
 }
 
