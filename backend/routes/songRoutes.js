@@ -7,12 +7,14 @@ const {
   createSong,
   updateSong,
   deleteSong,
-  setFavorite
+  setFavorite,
+  renameTheme
 } = require("../controllers/songController");
 
 router.use(protect);
 
 router.get("/", getSongs);
+router.post("/themes/rename", renameTheme);
 router.get("/:id", getSongById);
 router.post("/", createSong);
 router.put("/:id", updateSong);

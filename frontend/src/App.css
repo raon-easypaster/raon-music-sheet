@@ -701,3 +701,23 @@ button:hover {
 .theme-box { padding: 10px 12px; border: 1px solid var(--line, #e2e8f0); border-radius: 12px; background: var(--surface-2, #f8fafc); margin-bottom: 8px; }
 .theme-picker { display: flex; flex-direction: column; gap: 6px; }
 .theme-picker .meta-label { flex: none; }
+
+/* 목록에서 바로 주제 고치기 · 주제 관리 */
+.filter-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+.filter-row .filter-bar { flex: 1; min-width: 0; }
+.theme-line { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 4px; padding: 2px 0; background: none; border: none; color: inherit; font-weight: 500; text-align: left; cursor: pointer; }
+.theme-line:hover { background: none; }
+.theme-line-edit { font-size: 12px; color: var(--brand, #14532d); font-weight: 600; padding: 2px 6px; border-radius: 999px; border: 1px dashed var(--line-strong, #cbd5e1); }
+.theme-inline { margin-top: 8px; padding: 10px; border: 1px solid var(--line, #e2e8f0); border-radius: 12px; background: var(--surface-2, #f8fafc); display: flex; flex-direction: column; gap: 8px; }
+.new-theme .tag-input { max-width: 260px; }
+.new-theme button { font-size: 12px; padding: 4px 10px; }
+.theme-manager { border: 1px solid var(--line, #e2e8f0); border-radius: 12px; padding: 12px; margin-bottom: 12px; background: var(--surface-2, #f8fafc); }
+.theme-manager-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+.theme-manager-head .muted { flex: 1; font-size: 12px; }
+.theme-manager ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; }
+.theme-manager li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 10px; background: var(--surface, #fff); border: 1px solid var(--line, #e2e8f0); border-radius: 10px; font-size: 13px; }
+.theme-manager .muted { font-size: 12px; }
+.theme-actions, .theme-rename { display: flex; gap: 4px; flex-shrink: 0; }
+.theme-rename { flex: 1; }
+.theme-rename input { flex: 1; min-width: 0; margin: 0; padding: 4px 8px; }
+.theme-actions button, .theme-rename button { font-size: 12px; padding: 4px 8px; }

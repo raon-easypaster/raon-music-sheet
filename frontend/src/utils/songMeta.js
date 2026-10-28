@@ -8,6 +8,12 @@ export const TRAITS = ['경배', '찬양', '고백', '선포', '감사', '결단
 export const THEMES = ['예배', '은혜', '사랑', '십자가', '보혈', '부활', '믿음', '소망', '헌신', '선교', '평안', '말씀', '교회', '하나님 나라', '재림']
 export const SEASONS = ['대림절', '성탄절', '송구영신', '신년', '사순절', '종려주일', '고난주간', '부활절', '성령강림절', '맥추감사절', '추수감사절', '어린이주일', '어버이주일', '종교개혁주일']
 
+// 이 곡들에 쓰인 태그 중 추천 목록에 없는 것 (직접 넣은 주제) — 가나다순
+export function customThemes(songs = []) {
+  const set = new Set(songs.flatMap((s) => s.themes || []))
+  return [...set].filter((t) => !THEMES.includes(t) && !SEASONS.includes(t)).sort((a, b) => a.localeCompare(b, 'ko'))
+}
+
 // 곡 길이를 모를 때 예배 시간 계산에 쓰는 값
 export const DEFAULT_SONG_MINUTES = 4
 

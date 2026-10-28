@@ -3,10 +3,11 @@ import SongViewer from './SongViewer'
 import FavoriteStar from './FavoriteStar'
 import SheetPhotoButton from './SheetPhotoButton'
 import SongMetaFields, { ThemePicker } from './SongMetaFields'
+import ThemeManager from './ThemeManager'
 import SongFilterBar from './SongFilterBar'
 import { exportSongsCsv, exportBackupJson } from '../utils/exporters'
 import { formatKoreanDate } from '../utils/dates'
-import { metaFormValues, usageStats, usageText, applyMetaFilters, sortByUsage, EMPTY_FILTERS, NO_THEME, hasNoTheme, tempoFromBpm } from '../utils/songMeta'
+import { metaFormValues, usageStats, usageText, applyMetaFilters, sortByUsage, EMPTY_FILTERS, NO_THEME, hasNoTheme, customThemes, tempoFromBpm } from '../utils/songMeta'
 import { sortSongs, filterSongs, countByKey, filterByKey } from '../utils/songSort'
 
 const KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
@@ -22,7 +23,7 @@ const SORT_OPTIONS = [
   { value: 'stale',   label: '오래 안 부른 순' },
 ]
 
-export default function SongList({ songs, setlists = [], workspaceLabel = '개인', showOwner, canDelete = true, onDelete, onUpdate, onToggleFavorite }) {
+export default function SongList({ songs, setlists = [], workspaceLabel = '개인', showOwner, canDelete = true, onDelete, onUpdate, onToggleFavorite, onRenameTheme }) {
   const [viewing,      setViewing]      = useState(null)
   const [editing,      setEditing]      = useState(null)
   const [editForm,     setEditForm]     = useState({})
@@ -36,6 +37,31 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
   const [filters,      setFilters]      = useState(EMPTY_FILTERS)
   const [filterOpen,   setFilterOpen]   = useState(false)
   const [metaOpen,     setMetaOpen]     = useState(false)
+  const [themeEdit,    setThemeEdit]    = useState(null)   // 목록에서 바로 주제를 고치는 곡 id
+  const [themeDraft,   setThemeDraft]   = useState([])
+  const [themeSaving,  setThemeSaving]  = useState(false)
+  const [themeError,   setThemeError]   = useState('')
+  const [showThemes,   setShowThemes]   = useState(false)  // 주제 관리 창
+  const ourThemes = useMemo(() => customThemes(songs), [songs])
+
+  function openThemeEdit(song) {
+    setThemeEdit(song._id)
+    setThemeDraft([...(song.themes || [])])
+    setThemeError('')
+  }
+
+  async function saveThemes() {
+    setThemeSaving(true)
+    setThemeError('')
+    try {
+      await onUpdate(themeEdit, { themes: themeDraft })
+      setThemeEdit(null)
+    } catch (err) {
+      setThemeError(err.message)
+    } finally {
+      setThemeSaving(false)
+    }
+  }
 
   function openEdit(song) {
     setEditing(song)
@@ -149,8 +175,17 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
         </div>
 
         {songs.length > 0 && (
-          <SongFilterBar filters={filters} onChange={setFilters} open={filterOpen} onToggle={() => setFilterOpen((v) => !v)} songs={songs} />
+          <div className="filter-row">
+            <SongFilterBar filters={filters} onChange={setFilters} open={filterOpen} onToggle={() => setFilterOpen((v) => !v)} songs={songs} />
+            {onRenameTheme && (
+              <button type="button" className={showThemes ? 'filter-toggle on' : 'filter-toggle'} aria-expanded={showThemes}
+                onClick={() => setShowThemes((v) => !v)}>
+                주제 관리
+              </button>
+            )}
+          </div>
         )}
+        {showThemes && <ThemeManager songs={songs} onRename={onRenameTheme} onClose={() => setShowThemes(false)} />}
 
         {songs.length > 0 && (
           <div className="key-chips" role="group" aria-label="Key별 곡 수">
@@ -208,12 +243,29 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
                 {(song.tempo || tempoFromBpm(song.bpm)) && <span className="badge badge-meta">{song.tempo || tempoFromBpm(song.bpm)}</span>}
                 {song.timeSignature && <span className="badge badge-meta">{song.timeSignature}</span>}
                 {song.target        && <span className="badge badge-meta">{song.target}</span>}
-                {(song.themes || []).slice(0, 4).map((t) => <span key={t} className="badge badge-tag">#{t}</span>)}
                 {song.hymnNumber    && <span className="badge badge-meta">{song.hymnNumber}</span>}
                 {song.youtubeUrl    && <span className="badge badge-link">YT</span>}
                 {song.sheetImageUrl && <span className="badge badge-link">악보</span>}
                 {song.sheetPdfUrl   && <span className="badge badge-link">PDF</span>}
               </div>
+              {/* 주제: 누르면 그 자리에서 바로 고친다 */}
+              {themeEdit !== song._id && (
+                <button type="button" className="theme-line" onClick={() => openThemeEdit(song)} title="주제 고치기">
+                  {(song.themes || []).length
+                    ? <>{song.themes.map((t) => <span key={t} className="badge badge-tag">#{t}</span>)}<span className="theme-line-edit">✎ 주제</span></>
+                    : <span className="theme-line-edit">+ 주제 넣기</span>}
+                </button>
+              )}
+              {themeEdit === song._id && (
+                <div className="theme-inline">
+                  <ThemePicker value={themeDraft} suggestions={ourThemes} onChange={setThemeDraft} />
+                  {themeError && <p className="error-text">{themeError}</p>}
+                  <span className="song-settings-actions">
+                    <button type="button" onClick={saveThemes} disabled={themeSaving}>{themeSaving ? '저장 중...' : '주제 저장'}</button>
+                    <button type="button" className="secondary" onClick={() => setThemeEdit(null)}>취소</button>
+                  </span>
+                </div>
+              )}
             </div>
             <div className="song-actions">
               <button className="secondary" onClick={() => setViewing(song)}>보기</button>
@@ -255,7 +307,7 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
               </div>
 
               <div className="theme-box">
-                <ThemePicker value={editForm.themes} onChange={(themes) => setEditForm((f) => ({ ...f, themes }))} />
+                <ThemePicker value={editForm.themes} suggestions={ourThemes} onChange={(themes) => setEditForm((f) => ({ ...f, themes }))} />
               </div>
 
               <button type="button" className="secondary toggle-btn" onClick={() => setMetaOpen(v => !v)}>

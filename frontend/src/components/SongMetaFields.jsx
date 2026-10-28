@@ -70,8 +70,9 @@ export default function SongMetaFields({ value, onChange, hideThemes = false }) 
   )
 }
 
-// 주제·절기 태그 고르기 (추천 태그 + 직접 입력)
-export function ThemePicker({ value = [], onChange }) {
+// 주제·절기 태그 고르기 (추천 태그 + 우리가 넣은 주제 + 새 주제 직접 입력)
+// suggestions: 다른 곡에 직접 넣어 둔 주제 (버튼으로 다시 고를 수 있게)
+export function ThemePicker({ value = [], onChange, suggestions = [] }) {
   const [custom, setCustom] = useState('')
   const themes = value
   const toggle = (t) => onChange(themes.includes(t) ? themes.filter((x) => x !== t) : [...themes, t])
@@ -82,7 +83,7 @@ export function ThemePicker({ value = [], onChange }) {
     setCustom('')
   }
 
-  const extraTags = themes.filter((t) => !THEMES.includes(t) && !SEASONS.includes(t))
+  const ours = [...new Set([...suggestions, ...themes.filter((t) => !THEMES.includes(t) && !SEASONS.includes(t))])]
 
   return (
     <div className="theme-picker">
@@ -100,20 +101,29 @@ export function ThemePicker({ value = [], onChange }) {
             onClick={() => toggle(t)}>{t}</button>
         ))}
       </div>
-      <div className="tag-chips">
-        {extraTags.map((t) => (
-          <button key={t} type="button" className="on" title="눌러서 빼기" onClick={() => toggle(t)}>#{t} ✕</button>
-        ))}
+      {ours.length > 0 && (
+        <>
+          <div className="meta-label">우리가 넣은 주제</div>
+          <div className="tag-chips">
+            {ours.map((t) => (
+              <button key={t} type="button" className={themes.includes(t) ? 'on' : ''} aria-pressed={themes.includes(t)}
+                onClick={() => toggle(t)}>{t}</button>
+            ))}
+          </div>
+        </>
+      )}
+      <div className="tag-chips new-theme">
         <input
           className="tag-input"
           type="text"
-          placeholder="태그 직접 입력 후 Enter"
+          placeholder="목록에 없는 주제 직접 입력"
+          aria-label="새 주제"
           value={custom}
           maxLength={20}
           onChange={(e) => setCustom(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustom() } }}
-          onBlur={addCustom}
         />
+        <button type="button" className="secondary" onClick={addCustom} disabled={!custom.trim()}>+ 주제 추가</button>
       </div>
     </div>
   )

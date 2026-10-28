@@ -32,3 +32,8 @@ export function setFavorite(id, favorite) {
 export function deleteSong(id) {
   return apiFetch(`/songs/${id}`, { method: 'DELETE' })
 }
+
+// 작업 공간의 모든 곡에서 주제 이름 바꾸기 (to가 ''이면 그 주제를 뺀다)
+export function renameTheme(team, from, to) {
+  return apiFetch('/songs/themes/rename', { method: 'POST', body: JSON.stringify({ team: team || null, from, to }) })
+}

@@ -99,3 +99,30 @@ exports.setFavorite = async (req, res) => {
     res.status(500).json({ message: err.message })
   }
 }
+
+// POST /songs/themes/rename { team, from, to } — 작업 공간의 모든 곡에서 주제 이름을 바꾼다 (to가 비면 그 주제를 뺀다)
+exports.renameTheme = async (req, res) => {
+  try {
+    const ws = await resolveWorkspace(req.user, req.body.team)
+    if (!ws) return res.status(403).json({ message: FORBIDDEN_WORKSPACE })
+
+    const from = String(req.body.from ?? '').trim()
+    const to = String(req.body.to ?? '').trim().replace(/^#/, '').slice(0, 20)
+    if (!from || from.length > 20) return res.status(400).json({ message: '바꿀 주제를 골라 주세요' })
+    if (from === to) return res.json({ updated: 0 })
+
+    const songs = await Song.find({ ...ws.filter, themes: from }, 'themes').lean()
+    const ops = songs.map((s) => {
+      const next = []
+      for (const t of s.themes) {
+        const v = t === from ? to : t
+        if (v && !next.includes(v)) next.push(v)
+      }
+      return { updateOne: { filter: { _id: s._id }, update: { $set: { themes: next } } } }
+    })
+    if (ops.length) await Song.bulkWrite(ops)
+    res.json({ updated: ops.length })
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}

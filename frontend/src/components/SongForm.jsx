@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import SheetPhotoButton from './SheetPhotoButton'
 import SongMetaFields, { ThemePicker } from './SongMetaFields'
-import { EMPTY_META } from '../utils/songMeta'
+import { EMPTY_META, customThemes } from '../utils/songMeta'
 
 const KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
                'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'A#m', 'Bm']
 
 const EMPTY = { title: '', artist: '', key: '', bpm: '', capo: 0, youtubeUrl: '', mrUrl: '', sheetImageUrl: '', sheetPdfUrl: '', structure: '', notes: '', ...EMPTY_META }
 
-export default function SongForm({ onCreate }) {
+export default function SongForm({ onCreate, songs = [] }) {
   const [form, setForm] = useState(EMPTY)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -100,7 +100,7 @@ export default function SongForm({ onCreate }) {
       </div>
 
       <div className="theme-box">
-        <ThemePicker value={form.themes} onChange={(themes) => setForm((prev) => ({ ...prev, themes }))} />
+        <ThemePicker value={form.themes} suggestions={customThemes(songs)} onChange={(themes) => setForm((prev) => ({ ...prev, themes }))} />
       </div>
 
       <button type="button" className="secondary toggle-btn" onClick={() => setMetaOpen((v) => !v)}>

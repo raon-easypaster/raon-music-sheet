@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useAuth } from '../context/useAuth'
-import { getSongs, createSong, deleteSong, updateSong, setFavorite } from '../api/songs'
+import { getSongs, createSong, deleteSong, updateSong, setFavorite, renameTheme } from '../api/songs'
 import {
   getSetlists,
   createSetlist,
@@ -133,6 +133,7 @@ export default function Dashboard() {
     try { await deleteSong(songId); await loadData() } catch (err) { setError(err.message) }
   }
   async function handleUpdateSong(id, payload) { await updateSong(id, payload); await loadData() }
+  async function handleRenameTheme(from, to) { const res = await renameTheme(workspace, from, to); await loadData(); return res }
   async function handleReorder(setlistId, songIds) { await reorderSetlist(setlistId, songIds); await loadData() }
   // 별을 누르면 화면에 바로 반영하고, 저장에 실패하면 되돌린다
   async function handleToggleFavorite(songId, favorite) {
@@ -296,7 +297,7 @@ export default function Dashboard() {
         <>
           {tab === 0 && (
             <>
-              <SongForm onCreate={handleCreateSong} />
+              <SongForm onCreate={handleCreateSong} songs={songs} />
               <SongList
                 songs={songs}
                 setlists={setlists}
@@ -305,6 +306,7 @@ export default function Dashboard() {
                 canDelete={!currentTeam || currentTeam.owner?._id === user?._id}
                 onDelete={handleDeleteSong}
                 onUpdate={handleUpdateSong}
+                onRenameTheme={handleRenameTheme}
                 onToggleFavorite={handleToggleFavorite}
               />
             </>
