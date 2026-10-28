@@ -2,6 +2,7 @@ const mongoose = require('mongoose')
 const Team = require('../models/Team')
 const Setlist = require('../models/Setlist')
 const Assignment = require('../models/Assignment')
+const { LEAD_ROLE } = require('../utils/leader')
 const Unavailability = require('../models/Unavailability')
 const TeamPost = require('../models/TeamPost')
 const TeamPostSeen = require('../models/TeamPostSeen')
@@ -85,6 +86,8 @@ exports.createAssignment = async (req, res) => {
     if (!role) return fail(res, 400, '맡을 자리(역할)를 적어 주세요')
     if (role.length > ROLE_MAX) return fail(res, 400, `역할은 ${ROLE_MAX}자 이내로 적어 주세요`)
     if (!isId(userId)) return fail(res, 400, '배정할 팀원을 골라 주세요')
+    // '인도' 배정은 실시간 진행·콘티 확정 권한을 주므로 팀장만 할 수 있다
+    if (LEAD_ROLE.test(role) && !isOwner(req.team, req.user)) return fail(res, 403, '‘인도’ 배정은 팀장만 할 수 있습니다')
 
     const setlist = await findTeamSetlist(req.team, setlistId)
     if (!setlist) return fail(res, 404, '이 팀의 콘티를 찾을 수 없습니다')
