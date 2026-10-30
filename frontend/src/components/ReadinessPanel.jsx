@@ -98,7 +98,7 @@ export default function ReadinessPanel({ setlist, team, songs, offline, online, 
             <div>저장할 수 없는 악보: {st.blocked.map((b) => `${b.title} (${b.reason})`).join(', ')}</div>
           )}
           {st && !['nothing', 'unsupported'].includes(st.state) && setlist.shareToken && !st.dataSaved && (
-            <div className="muted">공유 화면의 곡 순서·Key는 아직 이 기기에 없습니다{setlist.hasSharePin ? ' (비밀번호가 걸린 콘티는 이 기기에서 공유 화면을 한 번 열어 주세요)' : ''}.</div>
+            <div className="muted">공유 화면의 곡 순서·Key는 아직 이 기기에 없습니다. ‘다시 저장’을 누르면 함께 받아 둡니다.</div>
           )}
         </Row>
 

@@ -1,5 +1,6 @@
 import { createContext, useEffect, useState } from 'react'
 import { loginRequest, signupRequest } from '../api/auth'
+import { apiFetch } from '../api/client'
 
 const AuthContext = createContext(null)
 
@@ -43,6 +44,8 @@ export function AuthProvider({ children }) {
   }
 
   function logout() {
+    // 이 기기의 악보 파일 쿠키도 지운다 (로그아웃한 기기에서 악보 주소로 열리지 않게)
+    apiFetch('/sheets/session', { method: 'DELETE', skipAuth: true }).catch(() => {})
     persist(null, null)
   }
 

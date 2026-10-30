@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const User = require('../models/User')
 const { takeAttempt, refundAttempt, clientIp } = require('../utils/rateLimit')
+const { ensureUserCookie } = require('../utils/sheetAccess')
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -55,6 +56,7 @@ exports.signup = async (req, res) => {
       password: hashedPassword,
     })
 
+    ensureUserCookie(req, res, user) // 악보 파일(<img>)용 쿠키
     res.status(201).json({
       _id: user._id,
       email: user.email,
@@ -128,6 +130,7 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: '임시 비밀번호가 만료되었습니다. 팀장에게 다시 초기화를 요청해 주세요' })
     }
 
+    if (!user.mustChangePassword) ensureUserCookie(req, res, user) // 악보 파일(<img>)용 쿠키
     res.json({
       _id: user._id,
       email: user.email,

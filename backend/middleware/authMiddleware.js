@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const { ensureUserCookie } = require("../utils/sheetAccess");
 
 exports.protect = async (req, res, next) => {
   let token;
@@ -26,6 +27,8 @@ exports.protect = async (req, res, next) => {
         });
       }
 
+      // 악보 파일(<img>)은 로그인 헤더를 못 붙이므로, 악보 주소 전용 쿠키를 맞춰 둔다
+      ensureUserCookie(req, res, user);
       return next();
     } catch (err) {
       return res.status(401).json({ message: "Not authorized" });

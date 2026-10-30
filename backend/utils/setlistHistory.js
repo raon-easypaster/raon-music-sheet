@@ -1,5 +1,6 @@
 // 콘티 수정 이력: 바뀌기 전·후 내용을 비교해 '2번 곡 Key C → D 변경'처럼 읽기 쉬운 내역을 만든다
 const { effectiveSheets } = require('./sheets')
+const { cleanFlow, flowText } = require('./flow')
 
 const KIND_LABEL = {
   slot: '찬양 자리', prayer: '기도', word: '말씀', announce: '광고',
@@ -31,6 +32,7 @@ function snapshot(setlist) {
       key: str(s.key),
       notes: str(s.notes),
       sheetId: str(s.sheetId),
+      flow: cleanFlow(s.flow),
     })),
     status: setlist.status || 'draft',
   }
@@ -83,6 +85,8 @@ function describeChanges(before, after, songs) {
     if (setting(before, id).notes !== setting(after, id).notes) out.push(`${no} 메모 변경`)
     const [sb, sa] = [setting(before, id).sheetId, setting(after, id).sheetId]
     if (sb !== sa) out.push(`${no} 악보 선택 ${sheetName(id, sb)} → ${sheetName(id, sa)}`)
+    const [fb, fa] = [flowText(setting(before, id).flow), flowText(setting(after, id).flow)]
+    if (fb !== fa) out.push(fa ? `${no} 진행 → ${fa}` : `${no} 진행 지움 (곡 기본 송폼 사용)`)
   })
 
   // 예배 순서 (곡이 아닌 항목, 곡 항목의 시간·메모)

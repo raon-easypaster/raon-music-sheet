@@ -9,6 +9,7 @@ const teamRoutes = require('./routes/teamRoutes')
 const sheetRoutes = require('./routes/sheetRoutes')
 const teamExtrasRoutes = require('./routes/teamExtrasRoutes')
 const annotationRoutes = require('./routes/annotationRoutes')
+const copyrightRoutes = require('./routes/copyrightRoutes')
 
 const app = express()
 
@@ -52,8 +53,14 @@ function connectDB() {
   return connecting
 }
 
-app.use(cors())
+// 개발 화면(localhost:5173)과 서버(localhost:5001)의 주소가 다를 때만 쿠키를 함께 주고받는다.
+// 배포에서는 화면과 서버가 같은 주소라 필요 없으므로 기본 설정 그대로 둔다
+app.use(process.env.NODE_ENV === 'production' || process.env.VERCEL
+  ? cors()
+  : cors({ origin: /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/, credentials: true }))
 app.use(express.json({ limit: '6mb' })) // 악보 사진(base64) 업로드용
+// 서버 응답(악보 파일·공유 콘티 내용)은 검색 사이트에 넣지 않는다
+app.use((req, res, next) => { res.set('X-Robots-Tag', 'noindex, nofollow, noarchive'); next() })
 app.use('/api', async (req, res, next) => {
   try {
     await connectDB()
@@ -70,6 +77,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api/sheets', sheetRoutes)
 app.use('/api/team-extras', teamExtrasRoutes)
 app.use('/api/annotations', annotationRoutes)
+app.use('/api/copyright', copyrightRoutes)
 
 app.get('/', (req, res) => {
   res.send('RAON music sheet API running')

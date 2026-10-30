@@ -40,7 +40,8 @@ export function generateShareToken(id) {
 const pinHeader = (pin) => (pin ? { 'x-share-pin': pin } : {})
 
 export function getPublicSetlist(token, pin) {
-  return apiFetch(`/setlists/public/${token}`, { skipAuth: true, headers: pinHeader(pin) })
+  // 로그인한 팀원이면 로그인 정보를 함께 보낸다 (팀원 전용 링크가 열리고, 비밀번호도 필요 없다)
+  return apiFetch(`/setlists/public/${token}`, { headers: pinHeader(pin) })
 }
 
 // 실시간 진행 상태. 로그인한 팀원이면 로그인 정보를 함께 보내 진행 권한을 받아 온다
@@ -72,6 +73,11 @@ export function duplicateSetlist(id, payload) {
 
 export function updateSongSettings(id, songId, payload, baseRevision) {
   return apiFetch(`/setlists/${id}/song-settings/${songId}`, { method: 'PUT', body: JSON.stringify({ ...payload, baseRevision }) })
+}
+
+// 링크만으로 누구나 보게 열지(true), 팀원·비밀번호로만 열리게 잠글지(false)
+export function setShareAccess(id, open) {
+  return apiFetch(`/setlists/${id}/share-access`, { method: 'PUT', body: JSON.stringify({ open }) })
 }
 
 export function setSharePin(id, pin) {

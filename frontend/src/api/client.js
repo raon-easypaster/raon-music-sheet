@@ -16,7 +16,7 @@ export function getToken() {
 }
 
 export async function apiFetch(endpoint, { skipAuth, ...options } = {}) {
-  // 공유 화면 요청(skipAuth)에는 로그인 정보를 싣지 않는다 → 오프라인 저장본도 쓸 수 있다
+  // skipAuth: 로그인 정보를 싣지 않는 요청
   const token = skipAuth ? null : getToken()
 
   const headers = {
@@ -31,6 +31,8 @@ export async function apiFetch(endpoint, { skipAuth, ...options } = {}) {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers,
+    // 개발 화면처럼 서버 주소가 다르면 악보 파일용 쿠키를 함께 주고받는다 (배포는 같은 주소라 기본값으로 충분)
+    ...(/^https?:/.test(API_BASE_URL) ? { credentials: 'include' } : {}),
   })
 
   const data = await response.json().catch(() => ({}))

@@ -9,6 +9,8 @@ import LiveControl from './LiveControl'
 import SetlistStatusPanel from './SetlistStatusPanel'
 import ReadinessPanel from './ReadinessPanel'
 import Icon from './Icon'
+import FlowEditor, { FlowChips } from './FlowEditor'
+import { flowText } from '../utils/flow'
 import { checkOffline, saveOffline as saveSheetsOffline, offlineSignature, sheetCacheUrl } from '../utils/offline'
 import { songSheetChoice, sheetName, keyStateText, pageCount } from '../utils/sheets'
 import { assetUrl } from '../api/client'
@@ -52,6 +54,7 @@ export default function SetlistDetail({
   onDuplicate,
   onSongSettings,
   onSharePin,
+  onShareAccess,
   onConfirm,
   onRestore,
   team = null,
@@ -75,7 +78,7 @@ export default function SetlistDetail({
   const [legacyPracticed, setLegacyPracticed] = useState(null) // 이 기기에만 남아 있는 예전 연습 표시
   const [showPrint,     setShowPrint]     = useState(false)
   const [settingsSong,  setSettingsSong]  = useState(null)   // Key·메모를 고치는 중인 곡
-  const [settingsForm,  setSettingsForm]  = useState({ key: '', notes: '', sheetId: '' })
+  const [settingsForm,  setSettingsForm]  = useState({ key: '', notes: '', sheetId: '', flow: [] })
   const [pinInput,      setPinInput]      = useState('')
   const [pinMsg,        setPinMsg]        = useState('')
   const [pickerFilters, setPickerFilters] = useState(EMPTY_FILTERS)
@@ -197,7 +200,7 @@ export default function SetlistDetail({
     () => localSongs.map((s) => {
       const own = settingsMap.get(s._id)
       const choice = songSheetChoice(s, own) // 이번 Key에 맞춰 고른 악보 (공유·인쇄·오프라인 저장이 모두 이것을 쓴다)
-      return { ...s, displayKey: own?.key || s.key, keyOverridden: !!own?.key, displayNotes: own?.notes || '', choice }
+      return { ...s, displayKey: own?.key || s.key, keyOverridden: !!own?.key, displayNotes: own?.notes || '', displayFlow: own?.flow || [], choice }
     }),
     [localSongs, settingsMap]
   )
@@ -449,12 +452,21 @@ export default function SetlistDetail({
   function openSettings(song) {
     const own = settingsMap.get(song._id)
     setSettingsSong(song)
-    setSettingsForm({ key: own?.key || '', notes: own?.notes || '', sheetId: own?.sheetId || '' })
+    setSettingsForm({ key: own?.key || '', notes: own?.notes || '', sheetId: own?.sheetId || '', flow: own?.flow || [] })
   }
 
   async function saveSettings(reset = false) {
-    const ok = await edit(() => onSongSettings(setlist._id, settingsSong._id, reset ? { key: '', notes: '', sheetId: '' } : settingsForm))
+    const ok = await edit(() => onSongSettings(setlist._id, settingsSong._id, reset ? { key: '', notes: '', sheetId: '', flow: [] } : settingsForm))
     if (ok) setSettingsSong(null)
+  }
+
+  async function changeShareAccess(open) {
+    if (open && !window.confirm('링크만 있으면 누구나(팀 밖 사람도) 이 콘티의 악보를 볼 수 있게 됩니다.\n악보는 저작권이 있는 자료라, 팀원 전용이나 공유 비밀번호를 권합니다.\n그래도 열까요?')) return
+    setPinMsg('')
+    try {
+      await onShareAccess(setlist._id, open)
+      setPinMsg(open ? '링크를 열었습니다. 링크만 있으면 누구나 볼 수 있습니다.' : '팀원 전용으로 잠갔습니다. 팀 밖 사람은 공유 비밀번호가 있어야 볼 수 있습니다.')
+    } catch (err) { setPinMsg(err.message) }
   }
 
   async function savePin(clear = false) {
@@ -493,6 +505,7 @@ export default function SetlistDetail({
         n += 1
         let line = `${at}${n}. ${s.title}`
         if (s.displayKey) line += ` | Key ${s.displayKey}`
+        if (s.displayFlow.length) line += `\n   🎼 ${flowText(s.displayFlow)}`
         if (s.displayNotes) line += `\n   📝 ${s.displayNotes}`
         lines.push(line)
       })
@@ -501,7 +514,8 @@ export default function SetlistDetail({
       if (s.artist) line += ` (${s.artist})`
       if (s.displayKey) line += ` | Key ${s.displayKey}`
       if (s.bpm > 0) line += ` | BPM ${s.bpm}`
-      if (s.structure) line += `\n   ${s.structure}`
+      if (s.displayFlow.length) line += `\n   🎼 ${flowText(s.displayFlow)}`
+      else if (s.structure) line += `\n   ${s.structure}`
       if (s.displayNotes) line += `\n   📝 ${s.displayNotes}`
       lines.push(line)
     })
@@ -710,10 +724,24 @@ export default function SetlistDetail({
             </button>
           </div>
 
+          {/* 누가 볼 수 있나: 팀원 전용(기본) / 열린 링크 */}
+          <div className={`share-access ${setlist.shareOpen ? 'is-open' : 'is-locked'}`}>
+            {setlist.shareOpen ? (
+              <span>⚠ <b>열린 링크</b> — 링크만 있으면 {setlist.hasSharePin ? '비밀번호를 아는 ' : ''}누구나 볼 수 있습니다. 악보 저작권을 생각해 팀원 전용으로 잠가 두기를 권합니다.</span>
+            ) : (
+              <span>🔐 <b>팀원 전용</b> — 팀원은 로그인하면 바로 열립니다. 팀 밖 사람은 {setlist.hasSharePin ? '아래 공유 비밀번호가 있어야' : '볼 수 없습니다 (필요하면 아래 공유 비밀번호를 걸어 알려 주세요)'}{setlist.hasSharePin ? ' 열립니다' : ''}.</span>
+            )}
+            {onShareAccess && (
+              <button type="button" className="secondary" onClick={() => changeShareAccess(!setlist.shareOpen)}>
+                {setlist.shareOpen ? '팀원 전용으로 잠그기' : '링크 열기'}
+              </button>
+            )}
+          </div>
+
           {/* 공유 비밀번호 (선택) */}
           <div className="share-pin">
             <span>
-              🔒 공유 비밀번호 {setlist.hasSharePin ? <b>걸려 있음</b> : <span className="muted-dark">없음 (링크만 있으면 누구나 볼 수 있음)</span>}
+              🔒 공유 비밀번호 {setlist.hasSharePin ? <b>걸려 있음</b> : <span className="muted-dark">없음{setlist.shareOpen ? ' (링크만 있으면 누구나 볼 수 있음)' : ' (팀원만 로그인해서 볼 수 있음)'}</span>}
             </span>
             <span className="share-pin-form">
               <input
@@ -844,7 +872,9 @@ export default function SetlistDetail({
                             </span>
                           ) : <span className="badge sheet-badge sheet-none">악보 없음</span>}
                         </div>
-                        {song.structure && (
+                        {song.displayFlow.length > 0 ? (
+                          <FlowChips flow={song.displayFlow} className="flow-row" />
+                        ) : song.structure && (
                           <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
                             {song.structure}
                           </div>
@@ -868,8 +898,8 @@ export default function SetlistDetail({
 
                   <span className="row-actions">
                     {song && (
-                      <button type="button" className="secondary" onClick={() => openSettings(song)} title="이 콘티에서만 쓸 Key·메모·악보">
-                        Key·악보·메모
+                      <button type="button" className="secondary" onClick={() => openSettings(song)} title="이 콘티에서만 쓸 Key·악보·진행·메모">
+                        Key·악보·진행
                       </button>
                     )}
                     <button type="button" className="secondary" onClick={() => openRowEdit(row)} title="시간·이름·메모">
@@ -966,6 +996,11 @@ export default function SetlistDetail({
                 </>
               )
             })()}
+            <div className="flow-field">
+              <span className="flow-field-title">진행 (이번에 부를 순서)</span>
+              <FlowEditor value={settingsForm.flow} structure={settingsSong.structure}
+                onChange={(flow) => setSettingsForm((f) => ({ ...f, flow }))} />
+            </div>
             <label>
               메모
               <textarea

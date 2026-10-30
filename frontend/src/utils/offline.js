@@ -1,4 +1,5 @@
 // 오프라인(인터넷 없이) 쓰기 위한 도우미. 실제 저장은 public/sw.js가 한다.
+import { getToken } from '../api/client'
 
 // 서비스 워커를 등록한다 (배포된 화면에서만 부른다)
 export function registerServiceWorker() {
@@ -95,9 +96,11 @@ export async function checkOffline({ setlistId, plan, signature, dataUrl }) {
 export async function saveOffline({ setlistId, plan, signature, dataUrl, pin, warmPdf }) {
   const urls = plan.flatMap((p) => p.urls)
   if (warmPdf) await warmPdf().catch(() => {})
-  // 공유 화면 내용(곡 순서·Key)도 받아 둔다. 비밀번호가 걸린 콘티는 공유 화면을 이 기기에서 한 번 열어야 저장된다
+  // 공유 화면 내용(곡 순서·Key)도 받아 둔다. 로그인한 팀원이면 잠긴 링크·비밀번호 걸린 링크도 그대로 받아진다
   if (dataUrl) {
-    await fetch(dataUrl, { headers: pin ? { 'x-share-pin': pin } : {} }).catch(() => {})
+    const token = getToken()
+    const headers = { ...(pin ? { 'x-share-pin': pin } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+    await fetch(dataUrl, { headers }).catch(() => {})
   }
   const r = await precacheSheets(urls)
   const status = await checkOffline({ setlistId, plan, signature: 'pending', dataUrl })

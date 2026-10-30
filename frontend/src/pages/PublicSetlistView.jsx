@@ -9,6 +9,9 @@ import { formatKoreanDate } from '../utils/dates'
 import { useSheetViews } from '../components/useSheetViews'
 import { SheetPageView, KeyNotice, PageNav } from '../components/SheetPageView'
 import { effectiveSheets } from '../utils/sheets'
+import { FlowChips } from '../components/FlowEditor'
+import LoginForm from '../components/LoginForm'
+import { useAuth } from '../context/useAuth'
 
 const POLL_MS = 3000
 
@@ -49,8 +52,21 @@ export default function PublicSetlistView() {
   const pinKey = `sharePin_${token}`
   const [pin,      setPin]      = useState(() => { try { return sessionStorage.getItem(pinKey) || '' } catch { return '' } })
   const [needPin,  setNeedPin]  = useState(false)
+  // 잠긴 링크(팀원 전용): 팀원 계정으로 로그인해야 열린다. 로그인하면 비밀번호도 필요 없다
+  const { token: authToken, user: authUser, logout } = useAuth()
+  const [needLogin, setNeedLogin] = useState(false)
+  const [showLogin, setShowLogin] = useState(false)
   const [pinInput, setPinInput] = useState('')
   const [pinError, setPinError] = useState('')
+
+  // 공유 화면은 검색 결과에 넣지 않는다 (서버 헤더가 없는 곳에서 열려도 지켜지게 화면에서도 알린다)
+  useEffect(() => {
+    const meta = document.createElement('meta')
+    meta.name = 'robots'
+    meta.content = 'noindex, nofollow, noarchive'
+    document.head.appendChild(meta)
+    return () => meta.remove()
+  }, [])
 
   // ── 실시간 진행 ──
   // follow(인도자 따라가기): 진행자가 넘기면 내 화면도 넘어간다
@@ -79,13 +95,16 @@ export default function PublicSetlistView() {
     setlistRef.current = data
     setSetlist(data)
     setNeedPin(false)
+    setNeedLogin(false)
     return data
-  }), [token, pin])
+  }), [token, pin, authToken]) // eslint-disable-line react-hooks/exhaustive-deps -- 로그인하면 다시 불러온다
 
   useEffect(() => {
     loadSetlist()
       .catch(err => {
-        if (err.data?.needPin) {
+        if (err.data?.needLogin) {
+          setNeedLogin(true)
+        } else if (err.data?.needPin) {
           setNeedPin(true)
           if (err.data.locked) setPinError(err.message)
           else if (pin) setPinError('비밀번호가 맞지 않습니다')
@@ -254,6 +273,27 @@ export default function PublicSetlistView() {
     </div>
   )
 
+  if ((needLogin || showLogin) && !authToken) return (
+    <div className="share-login">
+      <div className="card panel share-login-note">
+        <h2>🔒 팀원만 볼 수 있는 콘티입니다</h2>
+        <p>이 콘티의 팀 계정으로 로그인하면 열립니다.{!needLogin && ' 로그인하면 비밀번호 없이 열립니다.'}</p>
+        {!needLogin && <button type="button" className="secondary" onClick={() => setShowLogin(false)}>비밀번호로 열기</button>}
+      </div>
+      <LoginForm />
+    </div>
+  )
+
+  if (needLogin) return (
+    <div className="dashboard">
+      <div className="card panel pin-gate">
+        <h2>🔒 팀원만 볼 수 있는 콘티입니다</h2>
+        <p>지금 로그인한 <b>{authUser?.email || '계정'}</b>은 이 콘티를 볼 수 없는 계정입니다. 이 콘티의 팀 계정으로 다시 로그인하거나, 공유한 분에게 팀 초대나 공유 비밀번호를 받아 주세요.</p>
+        <button type="button" className="secondary" onClick={() => { logout(); setNeedLogin(false); setShowLogin(true) }}>다른 계정으로 로그인</button>
+      </div>
+    </div>
+  )
+
   if (needPin) return (
     <div className="dashboard">
       <form className="card panel pin-gate" onSubmit={submitPin}>
@@ -270,6 +310,7 @@ export default function PublicSetlistView() {
         />
         {pinError && <p className="error-text">{pinError}</p>}
         <button type="submit" disabled={pinInput.length < 4}>열기</button>
+        {!authToken && <button type="button" className="text-btn" onClick={() => setShowLogin(true)}>팀원이면 로그인해서 열기</button>}
       </form>
     </div>
   )
@@ -365,6 +406,11 @@ export default function PublicSetlistView() {
             <button type="button" className={showPageGrid ? 'is-on' : ''} onClick={() => setShowPageGrid(v => !v)}>⊞ 목록</button>
           </div>
           {song && <div className="sheet-key-dock"><KeyNotice song={song} dark compact /></div>}
+          {song?.flow?.length > 0 ? (
+            <div className="sheet-flow-dock"><span>진행</span><FlowChips flow={song.flow} className="flow-dark" /></div>
+          ) : song?.structure ? (
+            <div className="sheet-flow-dock"><span>송폼</span><b className="sheet-flow-text">{song.structure}</b></div>
+          ) : null}
 
           <div className="sheet-stage">
           {/* 곡 목록 오버레이 */}
@@ -541,7 +587,7 @@ export default function PublicSetlistView() {
           .mobile-song-bar { display: flex; }
         }
       `}</style>
-      {!sheetOnly && <p className="share-copyright">{COPYRIGHT_NOTICE}</p>}
+      {!sheetOnly && <p className="share-copyright">{COPYRIGHT_NOTICE} <a href="/copyright">저작권 신고·문의</a></p>}
     </div>
   )
 }
@@ -711,6 +757,12 @@ function SongContent({ song, views, page, onPage, shareToken, pin, currentIdx = 
           {song.bpm > 0 && <span className="badge badge-bpm">♩ {song.bpm} BPM</span>}
         </div>
       </div>
+
+      {song.flow?.length > 0 ? (
+        <div className="viewer-flow"><strong>진행</strong><FlowChips flow={song.flow} /></div>
+      ) : song.structure ? (
+        <div className="viewer-flow"><strong>송폼</strong><span className="viewer-flow-text">{song.structure}</span></div>
+      ) : null}
 
       {song.notes && (
         <div className="viewer-notes" style={{ marginBottom: 16 }}>

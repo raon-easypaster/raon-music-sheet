@@ -6,9 +6,15 @@ import { keyStateText } from '../utils/sheets'
 // 열지 못하면 이유와 할 수 있는 방법을 보여 준다
 export function SheetPageView({ view, song, shareToken, pin, dark = false, toolbarHost, wrapStyle, imgStyle, imgClassName }) {
   const [failedSrc, setFailedSrc] = useState(null)
+  const [blockedSrc, setBlockedSrc] = useState(null) // { src, status }: 차단(451)이나 권한 없음(401·403)으로 못 연 악보
   if (!view) return <SheetEmpty title={song?.title} dark={dark} />
   if (view.loading) return <div className={`sheet-msg${dark ? ' is-dark' : ''}`}>PDF 악보를 여는 중…</div>
   if (view.error) return <SheetError dark={dark} reason={view.error.reason} tip={view.error.tip} openUrl={view.openUrl} />
+  if (failedSrc === view.src && blockedSrc?.src === view.src) {
+    return blockedSrc.status === 451
+      ? <SheetError dark={dark} reason={BLOCKED_REASON} tip={BLOCKED_TIP} />
+      : <SheetError dark={dark} reason={NO_ACCESS_REASON} tip={NO_ACCESS_TIP} />
+  }
   if (failedSrc === view.src) {
     return (
       <SheetError
@@ -25,10 +31,22 @@ export function SheetPageView({ view, song, shareToken, pin, dark = false, toolb
     <SheetAnnotator key={`${song._id}:${view.pageKey}`} shareToken={shareToken} pin={pin} songId={song._id} page={view.pageKey}
       dark={dark} toolbarHost={toolbarHost} wrapStyle={wrapStyle}>
       <img src={view.src} alt={`${song.title} 악보`} className={imgClassName} style={imgStyle} draggable={false}
-        onError={() => setFailedSrc(view.src)} />
+        onError={() => {
+          const src = view.src
+          setFailedSrc(src)
+          // 앱에 올린 악보면 왜 못 여는지 서버에 한 번 물어본다 (차단됐는지)
+          if (/\/api\/sheets\//.test(src)) {
+            fetch(src, { credentials: 'include' }).then((r) => { if ([401, 403, 451].includes(r.status)) setBlockedSrc({ src, status: r.status }) }).catch(() => {})
+          }
+        }} />
     </SheetAnnotator>
   )
 }
+
+const NO_ACCESS_REASON = '이 악보를 볼 권한이 없습니다. 악보는 팀원이나 공유 링크로 연 사람만 볼 수 있어요.'
+const NO_ACCESS_TIP = '앱에 팀 계정으로 로그인하거나, 받은 공유 링크를 이 기기에서 다시 열어 주세요.'
+const BLOCKED_REASON = '저작권자의 요청으로 차단된 악보입니다.'
+const BLOCKED_TIP = '이 악보는 앱에서 더 이상 보여 줄 수 없습니다. 교회가 사용 권한을 가진 악보(구입한 악보·라이선스 곡)로 바꿔 올려 주세요. 문의는 앱의 ‘저작권 신고·문의’로 해 주세요.'
 
 export function SheetEmpty({ title, dark }) {
   return (

@@ -17,6 +17,7 @@ const {
   duplicateSetlist,
   updateSongSettings,
   setSharePin,
+  setShareAccess,
   setCurrentSong,
   updateItems,
   getTemplates,
@@ -51,6 +52,7 @@ router.put('/:id/remove-song', protect, removeSongFromSetlist)
 router.put('/:id/reorder', protect, reorderSongs)
 router.post('/:id/share', protect, getShareToken)
 router.put('/:id/share-pin', protect, setSharePin)
+router.put('/:id/share-access', protect, setShareAccess)
 router.get('/:id/live', protect, getLive)
 router.put('/:id/current', protect, setCurrentSong)
 router.post('/:id/live/release', protect, releaseLive)

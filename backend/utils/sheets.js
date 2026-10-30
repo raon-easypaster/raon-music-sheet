@@ -1,6 +1,7 @@
 // 곡의 악보(여러 Key·여러 장) 정리와 콘티 Key에 맞는 악보 고르기
 // 화면 쪽 frontend/src/utils/sheets.js와 같은 규칙이다. 한쪽을 바꾸면 다른 쪽도 함께 고친다.
 const crypto = require('crypto')
+const { cleanFlow, flowText } = require('./flow')
 
 const MAX_SHEETS = 10
 const MAX_PAGES = 30
@@ -126,6 +127,8 @@ function practiceFingerprint(song, setting) {
     normalizeKey(key),
     song.structure || '',
     setting?.notes || '',
+    // 진행을 적었을 때만 넣는다 (이 기능 전에 연습한 기록이 '재확인 필요'로 바뀌지 않게)
+    ...(setting?.flow?.length ? [flowText(cleanFlow(setting.flow))] : []),
   ])
   return crypto.createHash('sha1').update(data).digest('hex').slice(0, 16)
 }

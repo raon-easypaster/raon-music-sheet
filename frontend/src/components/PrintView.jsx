@@ -4,6 +4,7 @@ import { formatKoreanDate } from '../utils/dates'
 import { KIND_LABEL, formatMinutes } from '../utils/serviceOrder'
 import { effectiveSheets, keyStateText } from '../utils/sheets'
 import { assetUrl } from '../api/client'
+import { flowText } from '../utils/flow'
 import { renderPdfPages, explainPdfError } from '../utils/pdf'
 
 // 곡마다 '이번 Key로 고른 악보'의 모든 쪽을 인쇄 칸으로 (PDF는 쪽마다 그림으로 바꾼다)
@@ -150,6 +151,7 @@ export default function PrintView({ setlist, songs, order = null, totalMinutes =
                       <td>{KIND_LABEL[row.kind]}</td>
                       <td>
                         {row.songData ? <>{row.songData.title}{row.songData.displayKey && <b> · {row.songData.displayKey}</b>}</> : row.title}
+                        {row.songData?.displayFlow?.length > 0 && <small className="print-flow-inline"> 🎼 {flowText(row.songData.displayFlow)}</small>}
                         {row.note && <small> — {row.note}</small>}
                       </td>
                       <td>{row.minutes}분</td>
@@ -166,6 +168,7 @@ export default function PrintView({ setlist, songs, order = null, totalMinutes =
                     {s.title}
                     {s.displayKey && <b> · {s.displayKey}</b>}
                     {s.bpm > 0 && <span> · {s.bpm} BPM</span>}
+                    {s.displayFlow?.length > 0 && <small className="print-flow-inline"> 🎼 {flowText(s.displayFlow)}</small>}
                   </li>
                 ))}
               </ol>
@@ -184,6 +187,7 @@ export default function PrintView({ setlist, songs, order = null, totalMinutes =
                       <b>{cell.number}. {s.title}{cell.pageTotal > 1 && ` (${cell.pageNo}/${cell.pageTotal})`}</b>
                       {s.displayKey && <span className="print-key">{s.displayKey}</span>}
                       {keyNote && cell.pageNo <= 1 && <small className="print-keynote">{keyNote}</small>}
+                      {s.displayFlow?.length > 0 && cell.pageNo <= 1 && <small className="print-flow">진행 {flowText(s.displayFlow)}</small>}
                     </figcaption>
                     {cell.src ? (
                       <img src={cell.src} alt={`${s.title} 악보`} />

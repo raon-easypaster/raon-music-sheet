@@ -44,6 +44,12 @@ const setlistSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // 링크만으로 누구나 볼 수 있는지. 새 링크는 false(잠금: 팀원 로그인 또는 공유 비밀번호).
+    // 값이 없는 예전 링크는 열린 링크로 본다 (이미 보낸 링크가 갑자기 막히지 않게)
+    shareOpen: {
+      type: Boolean,
+      default: undefined,
+    },
     // 이 콘티에서만 쓰는 곡별 Key·메모 (곡 원본 정보는 그대로 둔다)
     songSettings: [
       {
@@ -52,6 +58,11 @@ const setlistSchema = new mongoose.Schema(
         key: { type: String, trim: true, default: '' },
         notes: { type: String, trim: true, default: '' },
         sheetId: { type: String, trim: true, default: '' }, // 직접 고른 악보. 빈 값 = Key에 맞춰 자동
+        // 이번 콘티에서 부를 진행(송폼). 비어 있으면 곡에 적어 둔 송폼을 그대로 쓴다 (utils/flow.js)
+        flow: {
+          type: [{ _id: false, part: String, n: Number, times: Number, note: String, label: String }],
+          default: undefined,
+        },
       },
     ],
     currentSongIdx: {
@@ -84,6 +95,7 @@ const setlistSchema = new mongoose.Schema(
 setlistSchema.set('toJSON', {
   transform(doc, ret) {
     ret.hasSharePin = !!ret.sharePinHash
+    ret.shareOpen = ret.shareOpen !== false // 값이 없는 예전 링크는 열린 링크 (이미 보낸 링크가 막히지 않게)
     delete ret.sharePinHash
     return ret
   },

@@ -6,7 +6,7 @@ const Song = require('../models/Song')
 const { parsePageKey, storedPageKey, songHasPage } = require('../utils/sheets')
 const { accessFilter } = require('../utils/access')
 const { takeAttempt } = require('../utils/rateLimit')
-const { checkSharePin, rejectPin } = require('../utils/sharePin')
+const { checkShareAccess, rejectShare } = require('../utils/sharePin')
 
 // 악보 위 필기 공유 (악보 페이지마다 따로: ?page=페이지번호, 없으면 예전 사진 악보 한 장)
 // - 악보를 바꾸면 페이지 번호가 달라지므로, 예전 필기가 새 악보의 다른 페이지에 잘못 보이지 않는다
@@ -91,14 +91,14 @@ exports.getPublicAnnotation = async (req, res) => {
   try {
     const { token, songId } = req.params
     if (!isId(songId)) return res.status(404).json({ message: NOT_FOUND })
-    const setlist = await Setlist.findOne({ shareToken: token }, 'songs sharePinHash shareToken')
+    const setlist = await Setlist.findOne({ shareToken: token }, 'songs sharePinHash shareToken shareOpen')
     if (!setlist) return res.status(404).json({ message: '유효하지 않은 링크입니다' })
 
     const user = await optionalUser(req)
     const member = user ? await findMemberSetlist(user, setlist._id) : null
     if (!member) {
-      const pinResult = await checkSharePin(setlist, req)
-      if (pinResult !== 'ok') return rejectPin(res, pinResult)
+      const access = await checkShareAccess(setlist, req)
+      if (access !== 'ok') return rejectShare(res, access)
     }
     if (!hasSong(setlist, songId)) return res.status(404).json({ message: NOT_FOUND })
     const pageKey = await resolvePage(req, songId)

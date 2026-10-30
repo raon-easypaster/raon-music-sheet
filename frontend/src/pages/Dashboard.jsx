@@ -13,6 +13,7 @@ import {
   duplicateSetlist,
   updateSongSettings,
   setSharePin,
+  setShareAccess,
   updateSetlistItems,
   getTemplates,
   createTemplate,
@@ -33,6 +34,7 @@ import HelpPage from '../components/HelpPage'
 import PracticeTools from '../components/PracticeTools'
 import InstallAppButton from '../components/InstallAppButton'
 import Icon from '../components/Icon'
+import { getOperatorInfo } from '../api/copyright'
 import TeamNews from '../components/TeamNews'
 import useTeamUnread from '../components/useTeamUnread'
 
@@ -62,6 +64,9 @@ export default function Dashboard() {
   const [error, setError] = useState('')
   const [tab, setTab] = useState(0)
   // 팀장이 임시 비밀번호로 초기화한 계정은 로그인하자마자 비밀번호 변경 창을 띄운다
+  // 운영자(ADMIN_EMAILS)면 위쪽에 저작권 신고 처리 버튼을 보여 준다
+  const [operatorInfo, setOperatorInfo] = useState(null)
+  useEffect(() => { getOperatorInfo().then(setOperatorInfo).catch(() => {}) }, [])
   const [showPwModal, setShowPwModal] = useState(() => !!user?.mustChangePassword)
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
   const [pwMsg, setPwMsg] = useState('')
@@ -169,7 +174,7 @@ export default function Dashboard() {
     }
   }
 
-  async function handleShare(setlistId) { return generateShareToken(setlistId) }
+  async function handleShare(setlistId) { const res = await generateShareToken(setlistId); await loadData(); return res }
   async function handleUpdateSetlist(setlistId, payload) { await editSetlist(setlistId, (rev) => updateSetlist(setlistId, payload, rev)) }
   async function handleUpdateItems(setlistId, items) { await editSetlist(setlistId, (rev) => updateSetlistItems(setlistId, items, rev)) }
   async function handleConfirm(setlistId, confirm) {
@@ -180,6 +185,7 @@ export default function Dashboard() {
   async function handleDeleteTemplate(templateId) { await deleteTemplate(templateId); await loadData() }
   async function handleSongSettings(setlistId, songId, payload) { await editSetlist(setlistId, (rev) => updateSongSettings(setlistId, songId, payload, rev)) }
   async function handleSharePin(setlistId, pin) { const res = await setSharePin(setlistId, pin); await loadData(); return res }
+  async function handleShareAccess(setlistId, open) { const res = await setShareAccess(setlistId, open); await loadData(); return res }
   async function handleDuplicate(setlistId, payload) {
     const copy = await duplicateSetlist(setlistId, payload)
     setSelectedSetlistId(copy._id)
@@ -225,6 +231,11 @@ export default function Dashboard() {
         <div style={{ display: 'flex', gap: '8px' }}>
           <button className="secondary" onClick={() => { setShowPwModal(true); setPwMsg('') }}>비밀번호 변경</button>
           <InstallAppButton />
+          {operatorInfo?.operator && (
+            <button className="secondary" onClick={() => { window.location.href = '/copyright/admin' }} title="저작권 신고 처리 (운영자)">
+              ©️ 신고{operatorInfo.open > 0 && <b className="copyright-badge">{operatorInfo.open}</b>}
+            </button>
+          )}
           <button className="secondary" onClick={logout}>로그아웃</button>
         </div>
       </header>
@@ -363,6 +374,7 @@ export default function Dashboard() {
                   onDuplicate={handleDuplicate}
                   onSongSettings={handleSongSettings}
                   onSharePin={handleSharePin}
+                  onShareAccess={handleShareAccess}
                   onConfirm={handleConfirm}
                   onRestore={handleRestore}
                   onReload={loadData}

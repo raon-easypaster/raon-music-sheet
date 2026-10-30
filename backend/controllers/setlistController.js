@@ -15,9 +15,12 @@ const { cleanItems, cleanStartTime, toTemplateItems, syncItemsWithSongs } = requ
 const { clientIp } = require('../utils/rateLimit')
 const { resolveWorkspace, accessFilter, canDelete, FORBIDDEN_WORKSPACE } = require('../utils/access')
 const { effectiveSheets, pickSheet, practiceFingerprint, normalizeKey } = require('../utils/sheets')
+const { cleanFlow, FLOW_MAX } = require('../utils/flow')
 const { snapshot, describeChanges } = require('../utils/setlistHistory')
 const { canLead, leaderSummary, sameId } = require('../utils/leader')
 const optionalUser = require('../utils/optionalUser')
+const { checkShareAccess, rejectShare } = require('../utils/sharePin')
+const { grantShare, ensureUserCookie } = require('../utils/sheetAccess')
 
 function cleanSetlistId(raw) {
   const cleanId = String(raw).trim().replace(/^"|"$/g, '')
@@ -261,78 +264,17 @@ exports.getShareToken = async (req, res) => {
 
     if (!setlist.shareToken) {
       setlist.shareToken = crypto.randomBytes(16).toString('hex')
+      setlist.shareOpen = false // 새 링크는 잠가 둔다: 팀원 로그인 또는 공유 비밀번호가 있어야 열린다
       await setlist.save()
     }
-    res.json({ shareToken: setlist.shareToken })
+    res.json({ shareToken: setlist.shareToken, shareOpen: setlist.shareOpen !== false })
   } catch (err) {
     res.status(500).json({ message: err.message })
   }
 }
 
-// PUBLIC VIEW BY TOKEN (no auth)
-// 공유 비밀번호가 걸린 콘티는 x-share-pin 헤더가 맞아야 한다 → 'ok' | 'wrong' | 'locked'
-// - 기기(IP)마다 5번 틀리면 그 기기만 15분 잠금 (다른 팀원은 영향 없음)
-// - 여러 기기에서 합쳐 30번 틀리면 링크 전체 잠금. 잠길 때마다 시간이 두 배(15분→30분→1시간…최대 24시간)가 된다.
-//   새 비밀번호는 6자리 이상이라 하루 30번으로는 맞히는 데 수십 년이 걸리므로, 무기한 잠금은 두지 않는다
-//   (누군가 일부러 틀려도 팀이 영영 못 쓰게 되지 않도록)
-// - 시도는 비밀번호를 확인하기 "전에" 원자적으로 하나씩 예약하므로, 동시에 많이 보내도 한도를 넘지 못한다
-const PIN_LOCK_MS = 15 * 60 * 1000
-const PIN_MAX_LOCK_MS = 24 * 60 * 60 * 1000
-const PIN_LIMITS = { ip: 5, link: 30 }
-
-
-// 시도 하나를 예약한다 → 'ok' | 'locked'
-// escalate: 링크 전체 기록이면 잠길 때마다 잠금 시간을 늘린다 (최대 24시간)
-async function reserveAttempt(key, limit, escalate = false) {
-  const now = new Date()
-  // 링크 기록은 잠금 이력을 기억해야 하므로 오래 보관한다
-  const keepUntil = new Date(now.getTime() + (escalate ? 7 * PIN_MAX_LOCK_MS : PIN_LOCK_MS * 2))
-  let doc
-  try {
-    doc = await PinAttempt.findOneAndUpdate(
-      { key, $or: [{ lockedUntil: null }, { lockedUntil: { $lte: now } }] },
-      { $inc: { attempts: 1 }, $set: { expireAt: keepUntil, lockedUntil: null } },
-      { new: true, upsert: true }
-    )
-  } catch (err) {
-    if (err.code !== 11000) throw err // 11000 = 잠긴 문서가 있어 새로 만들 수 없음 = 잠김
-    return 'locked'
-  }
-  if (doc.attempts <= limit) return 'ok'
-
-  const lockCount = (doc.lockCount || 0) + 1
-  const lockMs = escalate ? Math.min(PIN_LOCK_MS * 2 ** (lockCount - 1), PIN_MAX_LOCK_MS) : PIN_LOCK_MS
-  await PinAttempt.updateOne({ key }, { attempts: 0, lockCount, lockedUntil: new Date(now.getTime() + lockMs), expireAt: keepUntil })
-  return 'locked'
-}
-
-async function checkSharePin(setlist, req) {
-  if (!setlist.sharePinHash) return 'ok'
-  const pin = String(req.headers['x-share-pin'] || '')
-  if (!pin) return 'wrong' // 아직 비밀번호를 넣지 않은 첫 방문은 시도로 세지 않는다
-
-  const ipKey = `ip:${setlist.shareToken}:${clientIp(req)}`
-  const linkKey = `link:${setlist.shareToken}`
-  const ipResult = await reserveAttempt(ipKey, PIN_LIMITS.ip)
-  if (ipResult !== 'ok') return ipResult
-  const linkResult = await reserveAttempt(linkKey, PIN_LIMITS.link, true)
-  if (linkResult !== 'ok') return linkResult
-
-  if (await bcrypt.compare(pin, setlist.sharePinHash)) {
-    // 맞히면 이 기기의 기록은 지우고, 링크 전체 횟수에서는 이번 시도를 되돌린다
-    await PinAttempt.deleteOne({ key: ipKey })
-    await PinAttempt.updateOne({ key: linkKey, attempts: { $gt: 0 } }, { $inc: { attempts: -1 } })
-    return 'ok'
-  }
-  return 'wrong'
-}
-
-function rejectPin(res, result) {
-  if (result === 'locked') {
-    return res.status(429).json({ message: '비밀번호를 여러 번 틀려 15분 동안 잠겼습니다. 잠시 후 다시 시도하거나, 공유한 분에게 비밀번호를 새로 걸어 달라고 해 주세요', needPin: true, locked: true })
-  }
-  return res.status(401).json({ message: '이 콘티는 비밀번호가 필요합니다', needPin: true })
-}
+// PUBLIC VIEW BY TOKEN
+// 누가 볼 수 있는지는 utils/sharePin.js의 checkShareAccess가 정한다 (팀원 로그인 · 공유 비밀번호 · 열린 링크)
 
 // 곡 하나를 화면에 보낼 모양으로: 콘티 Key에 맞춰 고른 악보와 Key 비교 결과를 함께 담는다
 function songForView(s, own) {
@@ -357,6 +299,7 @@ function songForView(s, own) {
     keyState: pick.keyState,
     sheetChosen: pick.chosen,
     structure: s.structure,
+    flow: cleanFlow(own?.flow), // 이번 콘티의 진행 (비어 있으면 structure를 보여 준다)
     durationMin: s.durationMin || 0,
     notes: [own?.notes, s.notes].filter(Boolean).join('\n'),
   }
@@ -372,8 +315,11 @@ exports.getPublicSetlist = async (req, res) => {
   try {
     const setlist = await Setlist.findOne({ shareToken: req.params.token }).populate('songs')
     if (!setlist) return res.status(404).json({ message: '유효하지 않은 링크입니다' })
-    const pinResult = await checkSharePin(setlist, req)
-    if (pinResult !== 'ok') return rejectPin(res, pinResult)
+    const access = await checkShareAccess(setlist, req)
+    if (access !== 'ok') return rejectShare(res, access)
+    // 이 기기에서 이 콘티의 악보 파일을 열 수 있게 한다 (악보 사진·PDF는 볼 권한이 있는 사람에게만 나간다)
+    grantShare(req, res, setlist.shareToken)
+    ensureUserCookie(req, res, await optionalUser(req))
 
     const settings = new Map((setlist.songSettings || []).map((s) => [s.song.toString(), s]))
     res.json({
@@ -583,7 +529,7 @@ exports.duplicateSetlist = async (req, res) => {
   }
 }
 
-// PUT /setlists/:id/song-settings/:songId  { key, notes, sheetId } — 이 콘티에서만 쓸 Key·메모·악보 (모두 비우면 원래대로)
+// PUT /setlists/:id/song-settings/:songId  { key, notes, sheetId, flow } — 이 콘티에서만 쓸 Key·메모·악보·진행 (모두 비우면 원래대로)
 // Key를 바꾸는 것은 '이번에 부를 Key' 이름만 바꾸는 것이다. 악보 이미지·PDF 내용은 바뀌지 않는다
 exports.updateSongSettings = async (req, res) => {
   try {
@@ -600,8 +546,13 @@ exports.updateSongSettings = async (req, res) => {
         const song = await Song.findById(songId, 'sheets sheetImageUrl sheetPdfUrl').lean()
         if (!song || !effectiveSheets(song).some((s) => s.id === sheetId)) return { error: '이 곡에 없는 악보입니다' }
       }
+      // 진행: 보내지 않으면 지금 것을 그대로 둔다 (예전 화면이 저장해도 지워지지 않게)
+      const flow = req.body.flow === undefined ? cleanFlow(current?.flow) : cleanFlow(req.body.flow)
+      if (Array.isArray(req.body.flow) && req.body.flow.length > FLOW_MAX) return { error: `진행은 ${FLOW_MAX}칸까지 적을 수 있습니다` }
       const others = (setlist.songSettings || []).filter((s) => s.song.toString() !== songId)
-      setlist.songSettings = key || notes || sheetId ? [...others, { song: songId, key, notes, sheetId }] : others
+      setlist.songSettings = key || notes || sheetId || flow.length
+        ? [...others, { song: songId, key, notes, sheetId, ...(flow.length ? { flow } : {}) }]
+        : others
     })
   } catch (err) {
     res.status(500).json({ message: err.message })
@@ -626,6 +577,20 @@ exports.setSharePin = async (req, res) => {
       await PinAttempt.deleteMany({ key: { $regex: `^ip:${setlist.shareToken}:` } })
     }
     res.json({ hasSharePin: !!pin })
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}
+
+// PUT /setlists/:id/share-access  { open } — 링크만 있으면 누구나 볼 수 있게 열지(true), 잠글지(false)
+exports.setShareAccess = async (req, res) => {
+  try {
+    if (typeof req.body?.open !== 'boolean') return res.status(400).json({ message: 'open은 true 또는 false여야 합니다' })
+    const setlist = await findAccessibleSetlist(req)
+    if (!setlist) return res.status(404).json({ message: 'Setlist not found' })
+    setlist.shareOpen = req.body.open
+    await setlist.save()
+    res.json({ shareOpen: setlist.shareOpen })
   } catch (err) {
     res.status(500).json({ message: err.message })
   }

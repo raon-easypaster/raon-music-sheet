@@ -36,6 +36,7 @@ export function explainPdfError(err, url) {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     return { reason: '인터넷이 끊겨 PDF를 받지 못했습니다.', tip: '인터넷이 될 때 ‘악보 오프라인 저장’을 해 두면 끊겨도 볼 수 있어요.' }
   }
+  if (status === 451) return { reason: '저작권자의 요청으로 차단된 악보입니다.', tip: '교회가 사용 권한을 가진 악보(구입한 악보·라이선스 곡)로 바꿔 올려 주세요.' }
   if (status === 404) return { reason: 'PDF 파일을 찾을 수 없습니다 (주소가 바뀌었거나 지워졌을 수 있어요).', tip: tipUpload }
   if (status === 401 || status === 403) return { reason: 'PDF에 접근할 권한이 없습니다 (공유가 꺼져 있거나 로그인이 필요한 주소예요).', tip: tipUpload }
   if (err?.name === 'InvalidPDFException') {

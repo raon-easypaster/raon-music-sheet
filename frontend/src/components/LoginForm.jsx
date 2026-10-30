@@ -98,6 +98,7 @@ export default function LoginForm() {
             onUseEmail={(email) => { setForm((prev) => ({ ...prev, email })); setError('') }}
           />
         )}
+        <p className="auth-copyright"><a href="/copyright">저작권 신고·문의</a></p>
       </form>
     </div>
   )

@@ -18,6 +18,9 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // 악보 파일 올리기 전 '사용 권한이 있는 악보만 올린다'에 동의한 때와 그때 안내문 판 번호
+    sheetRightsAgreedAt: { type: Date, default: null },
+    sheetRightsVersion: { type: Number, default: 0 },
     // 각자 따로 표시하는 즐겨찾기 곡 (다른 사람에게는 보이지 않는다)
     favoriteSongs: [
       {

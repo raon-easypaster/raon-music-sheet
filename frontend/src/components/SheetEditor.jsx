@@ -1,7 +1,9 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { uploadSheetFile } from '../utils/sheetUpload'
 import { newSheetId, sheetName } from '../utils/sheets'
 import { assetUrl } from '../api/client'
+import SheetRightsDialog from './SheetRightsDialog'
+import { hasAgreedSheetRights } from '../utils/sheetRights'
 
 const KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
   'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'A#m', 'Bm']
@@ -18,6 +20,15 @@ export default function SheetEditor({ value, onChange, title }) {
   const [urlForm, setUrlForm] = useState(null) // { sheetId, url, type }
   const fileRef = useRef(null)
   const target = useRef(null) // { sheetId, replacePageId? }
+  // '사용 권한이 있는 악보만 올립니다' 동의. 미리 물어 두어야 파일 고르기 창이 바로 열린다
+  const [agreed, setAgreed] = useState(false)
+  const [askRights, setAskRights] = useState(null) // 동의하면 이어서 할 일
+  useEffect(() => {
+    let alive = true
+    hasAgreedSheetRights().then((ok) => { if (alive) setAgreed(ok) })
+    return () => { alive = false }
+  }, [])
+  const withRights = (fn) => (agreed ? fn() : setAskRights(() => fn))
 
   const update = (sheetId, fn) => onChange(sheets.map((s) => (s.id === sheetId ? fn(s) : s)))
   const say = (sheetId, text) => setStatus((m) => ({ ...m, [sheetId]: text }))
@@ -32,9 +43,11 @@ export default function SheetEditor({ value, onChange, title }) {
   }
 
   function pickFiles(sheetId, replacePageId) {
-    target.current = { sheetId, replacePageId }
-    fileRef.current.multiple = !replacePageId
-    fileRef.current.click()
+    withRights(() => {
+      target.current = { sheetId, replacePageId }
+      fileRef.current.multiple = !replacePageId
+      fileRef.current.click()
+    })
   }
 
   async function handleFiles(e) {
@@ -51,6 +64,7 @@ export default function SheetEditor({ value, onChange, title }) {
         const { url, type } = await uploadSheetFile(file, title)
         added.push({ id: newSheetId(), type, url })
       } catch (err) {
+        if (err.data?.needAgreement) setAgreed(false)
         errors.push(`${file.name}: ${err.message}`)
       }
     }
@@ -145,7 +159,7 @@ export default function SheetEditor({ value, onChange, title }) {
             <button type="button" className="secondary" onClick={() => pickFiles(sheet.id)} disabled={busy === sheet.id}>
               {busy === sheet.id ? '올리는 중…' : '📷 사진·PDF 올리기 (쪽 추가)'}
             </button>
-            <button type="button" className="secondary" onClick={() => setUrlForm({ sheetId: sheet.id, url: '', type: 'image' })}>🔗 주소로 쪽 추가</button>
+            <button type="button" className="secondary" onClick={() => withRights(() => setUrlForm({ sheetId: sheet.id, url: '', type: 'image' }))}>🔗 주소로 쪽 추가</button>
           </div>
           {urlForm?.sheetId === sheet.id && (
             <div className="sheet-url-form">
@@ -164,6 +178,12 @@ export default function SheetEditor({ value, onChange, title }) {
       ))}
 
       <button type="button" className="secondary sheet-add" onClick={addSheet}>+ 새 악보 추가 (다른 Key·다른 판)</button>
+      {askRights && (
+        <SheetRightsDialog
+          onCancel={() => setAskRights(null)}
+          onAgree={() => { setAgreed(true); const next = askRights; setAskRights(null); next() }}
+        />
+      )}
     </div>
   )
 }

@@ -4,6 +4,10 @@
 //   DRIVE_UPLOAD_SECRET : Apps Script에도 똑같이 넣어 둔 비밀 값
 
 // Vercel 요청 크기 한도(4.5MB) 안쪽. base64로 보내면 1.33배가 되므로 PDF는 3MB까지만 받는다
+const BlockedSheet = require('../models/BlockedSheet')
+const User = require('../models/User')
+const SheetFile = require('../models/SheetFile')
+const { canViewFile, clearCookies } = require('../utils/sheetAccess')
 const MAX_BYTES = { image: 4 * 1024 * 1024, pdf: 3 * 1024 * 1024 }
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const ALLOWED_TYPES = [...IMAGE_TYPES, 'application/pdf']
@@ -40,8 +44,34 @@ async function callScript(cfg, payload) {
 }
 
 // POST /api/sheets  { name, mimeType, data(base64) } → { url, type }
+// 악보 올리기 동의 안내문 판 번호. 안내문을 크게 바꾸면 올려서 모두에게 다시 묻는다 (화면 SheetRightsDialog와 같이)
+const SHEET_RIGHTS_VERSION = 1
+const hasAgreed = (user) => (user?.sheetRightsVersion || 0) >= SHEET_RIGHTS_VERSION
+
+// GET /sheets/agreement → { agreed, agreedAt, version }
+exports.getAgreement = (req, res) => {
+  res.json({ agreed: hasAgreed(req.user), agreedAt: req.user.sheetRightsAgreedAt, version: SHEET_RIGHTS_VERSION })
+}
+
+// POST /sheets/agreement  { version } — 화면에서 안내문을 읽고 체크한 뒤에만 부른다
+exports.agree = async (req, res) => {
+  try {
+    if (Number(req.body?.version) !== SHEET_RIGHTS_VERSION) {
+      return res.status(400).json({ message: '안내문이 바뀌었습니다. 화면을 새로 고친 뒤 다시 확인해 주세요' })
+    }
+    const at = new Date()
+    await User.updateOne({ _id: req.user._id }, { sheetRightsAgreedAt: at, sheetRightsVersion: SHEET_RIGHTS_VERSION })
+    res.json({ agreed: true, agreedAt: at, version: SHEET_RIGHTS_VERSION })
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}
+
 exports.uploadSheet = async (req, res) => {
   try {
+    if (!hasAgreed(req.user)) {
+      return res.status(403).json({ message: '악보를 올리기 전에 ‘사용 권한이 있는 악보만 올립니다’에 동의해 주세요', needAgreement: true, version: SHEET_RIGHTS_VERSION })
+    }
     const cfg = driveConfig()
     if (!cfg) return res.status(503).json({ message: '악보 파일 올리기가 아직 설정되지 않았습니다. 관리자에게 문의해 주세요. 그동안은 악보 주소(https://…)를 넣어 쓸 수 있습니다' })
 
@@ -81,18 +111,39 @@ exports.uploadSheet = async (req, res) => {
     }
     if (!FILE_ID.test(result.id || '')) throw new Error('구글 드라이브가 올바른 파일 번호를 돌려주지 않았습니다')
 
+    // 곡에 저장하기 전에도 올린 사람은 미리보기를 볼 수 있게 기록한다
+    await SheetFile.updateOne({ fileId: result.id }, { $setOnInsert: { fileId: result.id, uploadedBy: req.user._id } }, { upsert: true })
     res.status(201).json({ url: `/api/sheets/${result.id}`, type: isPdf ? 'pdf' : 'image' })
   } catch (err) {
     res.status(502).json({ message: err.message })
   }
 }
 
-// GET /api/sheets/:id → 사진·PDF (공유 링크에서도 보이도록 로그인 없이 열린다. 폴더 밖 파일은 Apps Script가 거절)
+// DELETE /api/sheets/session — 로그아웃할 때 이 기기의 악보 쿠키를 지운다
+exports.clearSession = (req, res) => {
+  clearCookies(req, res)
+  res.json({ ok: true })
+}
+
+// GET /api/sheets/:id → 사진·PDF. 볼 권한이 있는 사람에게만 보낸다 (utils/sheetAccess.js)
+// - 그 파일을 쓰는 곡의 팀원(개인 곡은 본인), 올린 사람, 그 곡이 든 콘티를 공유 링크로 연 기기, 운영자
 exports.getSheet = async (req, res) => {
   try {
     const cfg = driveConfig()
     if (!cfg) return res.status(503).json({ message: '악보 사진 저장소가 설정되지 않았습니다' })
     if (!FILE_ID.test(req.params.id)) return res.status(400).json({ message: '잘못된 사진 주소입니다' })
+    // 저작권 신고로 차단한 파일 (451 = 법적 사유로 볼 수 없음). 차단은 바로 보이도록 저장하지 않게 한다
+    if (await BlockedSheet.exists({ fileId: req.params.id })) {
+      res.set('Cache-Control', 'no-store')
+      return res.status(451).json({ message: '저작권자의 요청으로 차단된 악보입니다', blocked: true })
+    }
+    const access = await canViewFile(req, req.params.id)
+    if (access !== 'ok') {
+      res.set('Cache-Control', 'no-store')
+      return access === 'login'
+        ? res.status(401).json({ message: '로그인하거나 공유 링크로 연 사람만 볼 수 있는 악보입니다', needLogin: true })
+        : res.status(403).json({ message: '이 악보를 볼 권한이 없습니다' })
+    }
 
     const result = await callScript(cfg, { action: 'get', id: req.params.id })
     if (!ALLOWED_TYPES.includes(result.mimeType)) return res.status(415).json({ message: '악보 파일(사진·PDF)이 아닙니다' })
@@ -100,8 +151,9 @@ exports.getSheet = async (req, res) => {
     res.set('Content-Type', result.mimeType)
     if (result.mimeType === 'application/pdf') res.set('Content-Disposition', 'inline')
     res.set('X-Content-Type-Options', 'nosniff')
-    // 브라우저와 Vercel CDN에 오래 저장해 드라이브 호출을 줄인다 (같은 번호의 파일은 내용이 바뀌지 않는다)
-    res.set('Cache-Control', 'public, max-age=86400, s-maxage=2592000, immutable')
+    // 볼 권한을 사람마다 확인하므로 CDN(공용 저장소)에는 두지 않고, 이 기기 브라우저에만 1시간 둔다
+    // (짧게 두는 것은 저작권 신고로 차단했을 때 빨리 반영하려는 것이기도 하다)
+    res.set('Cache-Control', 'private, max-age=3600')
     res.set('X-Robots-Tag', 'noindex')
     res.send(Buffer.from(result.data, 'base64'))
   } catch (err) {

@@ -104,4 +104,7 @@ const songSchema = new mongoose.Schema(
   { timestamps: true }
 )
 
+// 악보 파일 주소로 곡을 찾는다 (악보 파일을 보여 줄 때 권한 확인)
+songSchema.index({ 'sheets.pages.url': 1 })
+
 module.exports = mongoose.model('Song', songSchema)

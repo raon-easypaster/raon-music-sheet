@@ -1,8 +1,8 @@
 /* RAON music sheet 서비스 워커
  * - 화면(앱 껍데기)을 저장해 두어 인터넷이 끊겨도 앱이 열리게 한다
- * - 악보 사진·PDF(/api/sheets/:id, 구글 사진)는 한 번 받으면 저장해 두고 다시 쓴다
+ * - 악보 사진·PDF(/api/sheets/:id, 구글 사진)는 한 번 받으면 저장해 두고 다시 쓴다 (저작권 신고로 차단되면 지운다)
  * - '악보 오프라인 저장'으로 미리 받은 다른 사이트의 악보 사진도 저장본이 있으면 그것을 쓴다
- * - 공유 콘티(/api/setlists/public/:token)는 마지막으로 받은 내용을 저장해 둔다
+ * - 공유 콘티(/api/setlists/public/:token)는 마지막으로 받은 내용을 저장해 둔다 (팀원 전용 링크 포함)
  * - 그 밖의 /api 응답(로그인 정보, 곡 목록 등)은 절대 저장하지 않는다
  * 화면 저장 방식을 바꾸면 SHELL_CACHE 번호를, 악보 저장 방식을 바꾸면 SHEET_CACHE 번호를 올린다.
  */
@@ -96,7 +96,13 @@ function isStorable(response, allowOpaque) {
 async function sheetCacheFirst(request) {
   const cache = await caches.open(SHEET_CACHE)
   const cached = await cache.match(request, { ignoreVary: true })
-  if (cached) return cached
+  if (cached) {
+    // 앱에 올린 악보는 뒤에서 한 번 확인해, 저작권 신고로 차단(451)됐으면 이 기기 저장본도 지운다
+    if (new URL(request.url).origin === self.location.origin) {
+      fetch(request).then((r) => { if (r.status === 451) cache.delete(request.url) }).catch(() => {})
+    }
+    return cached
+  }
   const response = await fetch(request)
   if (isStorable(response, true)) {
     await cache.put(request.url, response.clone())
@@ -113,6 +119,9 @@ async function dataNetworkFirst(request) {
     if (response.ok) {
       await cache.put(request.url, response.clone())
       trimCache(DATA_CACHE, MAX_DATA)
+    } else if ([401, 403, 404].includes(response.status)) {
+      // 서버가 이제 보여 주지 않는 콘티(잠금·팀 탈퇴·링크 삭제)는 이 기기 저장본도 지운다
+      await cache.delete(request.url)
     }
     return response
   } catch (err) {
@@ -182,8 +191,9 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (url.pathname.startsWith('/api/')) {
-    // 공유 콘티만 예외로 저장. 로그인 정보가 붙은 요청은 저장하지 않는다
-    if (!hasAuth && PUBLIC_SETLIST_RE.test(url.pathname)) {
+    // 공유 콘티만 예외로 저장. 내용은 누가 받든 같으므로 팀원(로그인) 요청도 저장한다
+    // (팀원 전용 링크도 인터넷이 끊긴 예배당에서 열리도록. 인터넷이 될 때는 늘 서버가 다시 확인한다)
+    if (PUBLIC_SETLIST_RE.test(url.pathname)) {
       event.respondWith(dataNetworkFirst(request))
     }
     return
