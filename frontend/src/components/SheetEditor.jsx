@@ -13,7 +13,7 @@ const guessType = (url) => (/\.pdf($|[?#])/i.test(url) ? 'pdf' : 'image')
 // 곡의 악보 편집: Key별로 여러 악보, 한 악보에 사진 여러 장 또는 PDF
 // - '새 악보 추가'는 다른 Key·다른 판 악보를 하나 더 만드는 것
 // - '페이지 추가'는 지금 악보에 쪽을 붙이는 것, '교체'는 그 쪽을 새 파일로 바꾸는 것 (그 쪽의 필기는 새 파일에 따라가지 않는다)
-export default function SheetEditor({ value, onChange, title }) {
+export default function SheetEditor({ value, onChange, title, team }) {
   const sheets = value || []
   const [status, setStatus] = useState({}) // 악보 id → 안내 문구
   const [busy, setBusy] = useState(null)   // 올리는 중인 악보 id
@@ -61,7 +61,7 @@ export default function SheetEditor({ value, onChange, title }) {
     const errors = []
     for (const file of files) {
       try {
-        const { url, type } = await uploadSheetFile(file, title)
+        const { url, type } = await uploadSheetFile(file, title, team)
         added.push({ id: newSheetId(), type, url })
       } catch (err) {
         if (err.data?.needAgreement) setAgreed(false)

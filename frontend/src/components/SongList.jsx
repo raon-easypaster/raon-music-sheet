@@ -330,7 +330,7 @@ export default function SongList({ songs, setlists = [], workspaceLabel = '개�
                 <div className="expanded-fields">
                   <input type="url" placeholder="YouTube URL (예배곡 영상)" value={editForm.youtubeUrl} onChange={set('youtubeUrl')} />
                   <input type="url" placeholder="MR / 반주 URL" value={editForm.mrUrl} onChange={set('mrUrl')} />
-                  <SheetEditor value={editForm.sheets} title={editForm.title}
+                  <SheetEditor value={editForm.sheets} title={editForm.title} team={editing?.team?._id || editing?.team || null}
                     onChange={(sheets) => setEditForm((f) => ({ ...f, sheets, sheetsTouched: true }))} />
                   <input type="text" placeholder="송폼 구조 (예: Intro - Verse - Chorus - Bridge)" value={editForm.structure} onChange={set('structure')} />
                   <textarea placeholder="메모 (연주 포인트, 전조 등)" value={editForm.notes} onChange={set('notes')} rows={3} />

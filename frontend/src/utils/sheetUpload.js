@@ -41,7 +41,8 @@ function readBase64(file) {
 const isPdfFile = (file) => file.type === 'application/pdf' || /\.pdf$/i.test(file.name)
 
 // 사진 또는 PDF를 올린다 → { url, type: 'image' | 'pdf' }
-export async function uploadSheetFile(file, title) {
+// team: 이 악보를 쓸 작업 공간(팀 id, 개인 공간이면 비움). 같은 팀원이 이 파일을 팀 곡에 쓸 수 있게 기록한다
+export async function uploadSheetFile(file, title, team) {
   if (isPdfFile(file)) {
     if (file.size > MAX_PDF_BYTES) {
       throw new Error(`PDF가 ${(file.size / 1024 / 1024).toFixed(1)}MB라 올릴 수 없습니다 (3MB 이하). 페이지를 나눠 올리거나, 사진으로 올리거나, PDF 주소를 넣어 주세요`)
@@ -49,21 +50,21 @@ export async function uploadSheetFile(file, title) {
     const data = await readBase64(file)
     const { url } = await apiFetch('/sheets', {
       method: 'POST',
-      body: JSON.stringify({ name: `${title || 'sheet'}.pdf`, mimeType: 'application/pdf', data }),
+      body: JSON.stringify({ name: `${title || 'sheet'}.pdf`, mimeType: 'application/pdf', data, team: team || undefined }),
     })
     return { url, type: 'pdf' }
   }
   if (!file.type.startsWith('image/')) throw new Error('사진(JPG·PNG 등)이나 PDF만 올릴 수 있습니다')
-  return { url: await uploadSheetPhoto(file, title), type: 'image' }
+  return { url: await uploadSheetPhoto(file, title, team), type: 'image' }
 }
 
 // 사진을 구글 드라이브 폴더에 올리고, 악보 이미지 칸에 넣을 주소를 돌려준다
-export async function uploadSheetPhoto(file, title) {
+export async function uploadSheetPhoto(file, title, team) {
   if (!file.type.startsWith('image/')) throw new Error('사진 파일만 올릴 수 있습니다')
   const data = await compress(file)
   const { url } = await apiFetch('/sheets', {
     method: 'POST',
-    body: JSON.stringify({ name: `${title || 'sheet'}.jpg`, mimeType: 'image/jpeg', data }),
+    body: JSON.stringify({ name: `${title || 'sheet'}.jpg`, mimeType: 'image/jpeg', data, team: team || undefined }),
   })
   return url
 }

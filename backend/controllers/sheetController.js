@@ -7,6 +7,7 @@
 const BlockedSheet = require('../models/BlockedSheet')
 const User = require('../models/User')
 const SheetFile = require('../models/SheetFile')
+const { resolveWorkspace } = require('../utils/access')
 const { canViewFile, clearCookies } = require('../utils/sheetAccess')
 const MAX_BYTES = { image: 4 * 1024 * 1024, pdf: 3 * 1024 * 1024 }
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
@@ -69,6 +70,13 @@ exports.agree = async (req, res) => {
 
 exports.uploadSheet = async (req, res) => {
   try {
+    // 어느 작업 공간에 쓸 파일인지 (내가 속한 팀만). 다른 팀원은 같은 팀 곡에서만 이 파일을 쓸 수 있다
+    let uploadTeam = null
+    if (req.body?.team) {
+      const ws = await resolveWorkspace(req.user, String(req.body.team))
+      if (!ws) return res.status(403).json({ message: '팀을 찾을 수 없거나 팀원이 아닙니다' })
+      uploadTeam = ws.team?._id || null
+    }
     if (!hasAgreed(req.user)) {
       return res.status(403).json({ message: '악보를 올리기 전에 ‘사용 권한이 있는 악보만 올립니다’에 동의해 주세요', needAgreement: true, version: SHEET_RIGHTS_VERSION })
     }
@@ -112,7 +120,7 @@ exports.uploadSheet = async (req, res) => {
     if (!FILE_ID.test(result.id || '')) throw new Error('구글 드라이브가 올바른 파일 번호를 돌려주지 않았습니다')
 
     // 곡에 저장하기 전에도 올린 사람은 미리보기를 볼 수 있게 기록한다
-    await SheetFile.updateOne({ fileId: result.id }, { $setOnInsert: { fileId: result.id, uploadedBy: req.user._id } }, { upsert: true })
+    await SheetFile.updateOne({ fileId: result.id }, { $setOnInsert: { fileId: result.id, uploadedBy: req.user._id, team: uploadTeam } }, { upsert: true })
     res.status(201).json({ url: `/api/sheets/${result.id}`, type: isPdf ? 'pdf' : 'image' })
   } catch (err) {
     res.status(502).json({ message: err.message })

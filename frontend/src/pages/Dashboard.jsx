@@ -334,7 +334,7 @@ export default function Dashboard() {
         <>
           {tab === 0 && (
             <>
-              <SongForm onCreate={handleCreateSong} songs={songs} />
+              <SongForm onCreate={handleCreateSong} songs={songs} team={workspace || null} />
               <SongList
                 songs={songs}
                 setlists={setlists}

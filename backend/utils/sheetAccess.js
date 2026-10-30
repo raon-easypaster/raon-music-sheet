@@ -118,22 +118,23 @@ async function canViewFile(req, fileId) {
 
 // 곡에 넣으려는 앱 악보 파일(/api/sheets/…)을 이 사람이 써도 되는지.
 // 남의 팀 파일 주소를 내 곡에 넣어 볼 권한을 얻지 못하게 한다 (파일을 보는 권한은 그 파일을 쓰는 곡으로 정하므로)
-// - 내가 올린 파일, 같은 팀 사람이 올린 파일(팀 곡일 때), 또는 내가 볼 수 있는 곡에 이미 들어 있는 파일만 된다
+// - 내가 올린 파일, 이 팀에 쓰려고 올린 파일(팀 곡일 때), 또는 내가 볼 수 있는 곡에 이미 들어 있는 파일만 된다
 // - 누가 올렸는지 기록이 없고 어느 곡에도 없는 예전 파일은 막지 않는다 (주인을 알 수 없음)
 const FILE_URL = /^\/api\/sheets\/([A-Za-z0-9_-]{20,100})$/
 function fileIdsOf(song) {
   const urls = [song?.sheetImageUrl, song?.sheetPdfUrl, ...((song?.sheets || []).flatMap((s) => (s.pages || []).map((p) => p.url)))]
-  return new Set(urls.map((u) => (String(u || '').match(FILE_URL) || [])[1]).filter(Boolean))
+  // DB가 저장할 때 앞뒤 공백을 지우므로(trim) 검사도 똑같이 지운 값으로 한다
+  return new Set(urls.map((u) => (String(u || '').trim().match(FILE_URL) || [])[1]).filter(Boolean))
 }
 async function checkFileUse(user, song, before) {
   const had = before ? fileIdsOf(before) : new Set()
   const added = [...fileIdsOf(song)].filter((id) => !had.has(id))
   if (!added.length) return null
   const filter = await accessFilter(user)
-  const team = song.team ? await Team.findOne({ _id: song.team, members: user._id }, 'members').lean() : null
-  const uploaders = [user._id, ...(team?.members || [])]
+  const team = song.team ? await Team.exists({ _id: song.team, members: user._id }) : null
   for (const fileId of added) {
-    if (await SheetFile.exists({ fileId, uploadedBy: { $in: uploaders } })) continue
+    if (await SheetFile.exists({ fileId, uploadedBy: user._id })) continue
+    if (team && await SheetFile.exists({ fileId, team: team._id })) continue
     const url = `/api/sheets/${fileId}`
     const ref = { $or: [{ 'sheets.pages.url': url }, { sheetImageUrl: url }, { sheetPdfUrl: url }] }
     if (await Song.exists({ $and: [ref, filter] })) continue // 둘 다 $or라서 펼쳐 합치면 하나가 덮인다

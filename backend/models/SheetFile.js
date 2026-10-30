@@ -6,6 +6,8 @@ const sheetFileSchema = new mongoose.Schema(
   {
     fileId: { type: String, required: true, unique: true },
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    // 어느 작업 공간에 쓰려고 올렸는지 (팀 id, 개인 공간이면 null). 같은 팀 곡에만 다른 팀원이 쓸 수 있다
+    team: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', default: null },
   },
   { timestamps: true }
 )

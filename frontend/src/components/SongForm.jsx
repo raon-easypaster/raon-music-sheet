@@ -8,7 +8,7 @@ const KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
 
 const EMPTY = { title: '', artist: '', key: '', bpm: '', capo: 0, youtubeUrl: '', mrUrl: '', sheets: [], structure: '', notes: '', ...EMPTY_META }
 
-export default function SongForm({ onCreate, songs = [] }) {
+export default function SongForm({ onCreate, songs = [], team = null }) {
   const [form, setForm] = useState(EMPTY)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -128,7 +128,7 @@ export default function SongForm({ onCreate, songs = [] }) {
             value={form.mrUrl}
             onChange={handleChange}
           />
-          <SheetEditor value={form.sheets} title={form.title} onChange={(sheets) => setForm((prev) => ({ ...prev, sheets }))} />
+          <SheetEditor value={form.sheets} title={form.title} team={team} onChange={(sheets) => setForm((prev) => ({ ...prev, sheets }))} />
           <input
             type="text"
             name="structure"
