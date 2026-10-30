@@ -8,6 +8,7 @@ module.exports = async function optionalUser(req) {
   if (!auth.startsWith('Bearer ')) return null
   try {
     const decoded = jwt.verify(auth.split(' ')[1], process.env.JWT_SECRET)
+    if (decoded.aud) return null // 악보 파일 전용 쿠키(aud: sheets)는 로그인 토큰이 아니다
     const user = await User.findById(decoded.id).select('-password')
     if (!user || user.mustChangePassword) return null
     return user

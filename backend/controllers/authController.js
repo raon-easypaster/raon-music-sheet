@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken')
 const User = require('../models/User')
 const { takeAttempt, refundAttempt, clientIp } = require('../utils/rateLimit')
 const { ensureUserCookie } = require('../utils/sheetAccess')
+const { operatorEmails } = require('../utils/operator')
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -38,6 +39,12 @@ exports.signup = async (req, res) => {
     const validationError = validateEmailAndPassword(email, password)
     if (validationError) {
       return res.status(400).json({ message: validationError })
+    }
+
+    // 운영자(ADMIN_EMAILS) 이메일은 여기서 새로 가입할 수 없다.
+    // 가입할 때 이메일 확인을 하지 않으므로, 운영자가 가입하기 전에 남이 그 이메일로 먼저 가입해 운영자가 되는 것을 막는다
+    if (operatorEmails().includes(email)) {
+      return res.status(403).json({ message: '이 이메일로는 새로 가입할 수 없습니다. 관리자에게 문의해 주세요' })
     }
 
     const existingUser = await User.findOne({ email })

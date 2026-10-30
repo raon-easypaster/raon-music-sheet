@@ -4,6 +4,7 @@ const { resolveWorkspace, accessFilter, isTeamOwner, FORBIDDEN_WORKSPACE } = req
 const User = require('../models/User')
 const { cleanSongMeta, tempoFromBpm } = require('../utils/songMeta')
 const { cleanSheets, mirrorFields } = require('../utils/sheets')
+const { checkFileUse } = require('../utils/sheetAccess')
 
 const SONG_FIELDS = ['title', 'artist', 'key', 'bpm', 'capo', 'youtubeUrl', 'mrUrl', 'sheetImageUrl', 'sheetPdfUrl', 'structure', 'notes']
 
@@ -56,6 +57,8 @@ exports.createSong = async (req, res) => {
     if (!data.tempo) data.tempo = tempoFromBpm(data.bpm)
     const sheetError = applySheets(data, req.body)
     if (sheetError) return res.status(400).json({ message: sheetError })
+    const fileError = await checkFileUse(req.user, data, null)
+    if (fileError) return res.status(403).json({ message: fileError })
 
     const song = await Song.create(data)
     res.status(201).json(song)
@@ -69,12 +72,15 @@ exports.updateSong = async (req, res) => {
   try {
     const song = await Song.findOne({ _id: req.params.id, ...(await accessFilter(req.user)) })
     if (!song) return res.status(404).json({ message: '곡을 찾을 수 없습니다' })
+    const before = song.toObject()
 
     SONG_FIELDS.forEach((f) => { if (req.body[f] !== undefined) song[f] = req.body[f] })
     Object.assign(song, cleanSongMeta(req.body))
     if (!song.tempo) song.tempo = tempoFromBpm(song.bpm)
     const sheetError = applySheets(song, req.body)
     if (sheetError) return res.status(400).json({ message: sheetError })
+    const fileError = await checkFileUse(req.user, song, before)
+    if (fileError) return res.status(403).json({ message: fileError })
 
     const updated = await song.save()
     res.json(updated)

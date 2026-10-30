@@ -318,7 +318,7 @@ exports.getPublicSetlist = async (req, res) => {
     const access = await checkShareAccess(setlist, req)
     if (access !== 'ok') return rejectShare(res, access)
     // 이 기기에서 이 콘티의 악보 파일을 열 수 있게 한다 (악보 사진·PDF는 볼 권한이 있는 사람에게만 나간다)
-    grantShare(req, res, setlist.shareToken)
+    grantShare(req, res, setlist)
     ensureUserCookie(req, res, await optionalUser(req))
 
     const settings = new Map((setlist.songSettings || []).map((s) => [s.song.toString(), s]))
