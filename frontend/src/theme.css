@@ -608,3 +608,11 @@ input::placeholder, textarea::placeholder { color: var(--ink-3); }
 @media (max-width: 600px) { .copyright-detail dl { grid-template-columns: 1fr; } .copyright-detail dt { margin-top: 4px; } }
 .copyright-form select, .copyright-form textarea { font: inherit; font-size: 15px; padding: 10px 12px; width: 100%; box-sizing: border-box; }
 .copyright-form button[type=submit]:disabled, .copyright-form button[type=submit]:disabled:hover { background: var(--brand); color: #fff; opacity: 0.4; }
+
+/* 악보가 아직 없을 때 바로 넣기 */
+.sheet-quick { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); margin-bottom: 8px; }
+.sheet-quick-row { display: flex; gap: 6px; }
+.sheet-quick-row input { flex: 1; min-width: 0; }
+.sheet-quick-row button { white-space: nowrap; }
+.sheet-quick-row button:disabled, .sheet-quick-row button:disabled:hover { background: var(--brand); color: #fff; opacity: 0.4; }
+.sheet-quick-tip { margin: 0; font-size: 12px; color: var(--ink-3); line-height: 1.5; }

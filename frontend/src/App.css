@@ -458,6 +458,8 @@ button:hover {
   align-items: center;
   justify-content: center;
   z-index: 2000;
+  padding: 16px;
+  box-sizing: border-box;
 }
 
 .modal-box {
@@ -467,6 +469,13 @@ button:hover {
   width: 100%;
   max-width: 360px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  box-sizing: border-box;
+  /* 내용이 화면보다 길면(곡 수정 창 등) 창 안에서 스크롤한다 */
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .modal-box h2 {

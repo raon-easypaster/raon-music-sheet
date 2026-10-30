@@ -98,6 +98,26 @@ export default function SheetEditor({ value, onChange, title, team }) {
     update(sheetId, (s) => ({ ...s, pages: s.pages.filter((p) => p.id !== page.id) }))
   }
 
+  // 아직 악보가 없을 때: 악보 하나를 만들면서 바로 주소를 넣거나 파일을 올린다
+  const [quickUrl, setQuickUrl] = useState('')
+  const [quickMsg, setQuickMsg] = useState('')
+  function quickAddUrl() {
+    const url = quickUrl.trim()
+    if (!/^https?:\/\//i.test(url)) { setQuickMsg('https:// 로 시작하는 악보 주소를 넣어 주세요'); return }
+    withRights(() => {
+      onChange([...sheets, { id: newSheetId(), key: '', label: '', pages: [{ id: newSheetId(), type: guessType(url), url }] }])
+      setQuickUrl('')
+      setQuickMsg('')
+    })
+  }
+  function quickUpload() {
+    withRights(() => {
+      const id = newSheetId()
+      onChange([...sheets, { id, key: '', label: '', pages: [] }])
+      pickFiles(id)
+    })
+  }
+
   function addUrl() {
     const url = urlForm.url.trim()
     if (!/^https?:\/\//i.test(url)) { say(urlForm.sheetId, 'https:// 로 시작하는 주소를 넣어 주세요'); return }
@@ -113,6 +133,21 @@ export default function SheetEditor({ value, onChange, title, team }) {
         악보는 <b>Key별로 여러 개</b> 넣을 수 있어요. 콘티에서 Key를 고르면 그 Key 악보를 먼저 씁니다.
         한 악보에 사진 여러 장이나 PDF를 넣으면 순서대로 넘겨 봅니다. 교회가 사용 권한을 가진 악보만 올려 주세요.
       </p>
+
+      {sheets.length === 0 && (
+        <div className="sheet-quick">
+          <b>악보 넣기</b>
+          <div className="sheet-quick-row">
+            <input type="url" inputMode="url" placeholder="악보 주소 붙여 넣기 (https://… 사진 또는 PDF)" value={quickUrl}
+              onChange={(e) => { setQuickUrl(e.target.value); setQuickMsg('') }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); quickAddUrl() } }} aria-label="악보 주소" />
+            <button type="button" onClick={quickAddUrl} disabled={!quickUrl.trim()}>🔗 주소 넣기</button>
+          </div>
+          <button type="button" className="secondary" onClick={quickUpload}>📷 사진·PDF 파일 올리기</button>
+          {quickMsg && <p className="sheet-status">{quickMsg}</p>}
+          <p className="sheet-quick-tip">주소는 브라우저 주소창에 넣었을 때 <b>그림이나 PDF가 바로 열리는 주소</b>여야 합니다. 넣은 뒤 아래에서 이 악보의 Key를 고르고, 곡을 저장하세요.</p>
+        </div>
+      )}
 
       {sheets.map((sheet, si) => (
         <div key={sheet.id} className="sheet-card">
@@ -177,7 +212,7 @@ export default function SheetEditor({ value, onChange, title, team }) {
         </div>
       ))}
 
-      <button type="button" className="secondary sheet-add" onClick={addSheet}>+ 새 악보 추가 (다른 Key·다른 판)</button>
+      {sheets.length > 0 && <button type="button" className="secondary sheet-add" onClick={addSheet}>+ 새 악보 추가 (다른 Key·다른 판)</button>}
       {askRights && (
         <SheetRightsDialog
           onCancel={() => setAskRights(null)}
