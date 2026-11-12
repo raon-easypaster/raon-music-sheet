@@ -3,7 +3,7 @@ import { useAuth } from '../context/useAuth'
 import AccountHelp from './AccountHelp'
 
 export default function LoginForm() {
-  const { login, signup, loading } = useAuth()
+  const { login, signup, loading, expired } = useAuth()
   const [isSignup, setIsSignup] = useState(false)
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
@@ -92,6 +92,7 @@ export default function LoginForm() {
         </button>
 
         {error ? <p className="error-text">{error}</p> : null}
+        {!error && expired ? <p className="error-text" role="status">로그인이 만료되었습니다. 다시 로그인해 주세요. (곡과 콘티는 그대로 있습니다)</p> : null}
 
         {!isSignup && (
           <AccountHelp

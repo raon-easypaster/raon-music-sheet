@@ -11,6 +11,8 @@ export function assetUrl(url) {
   return API_BASE_URL.replace(/\/api$/, '') + url
 }
 
+export const AUTH_EXPIRED_EVENT = 'raon:auth-expired'
+
 export function getToken() {
   return localStorage.getItem('token')
 }
@@ -38,6 +40,10 @@ export async function apiFetch(endpoint, { skipAuth, ...options } = {}) {
   const data = await response.json().catch(() => ({}))
 
   if (!response.ok) {
+    // 로그인이 만료됨 → 화면(AuthContext)이 로그아웃하고 로그인 화면으로 보낸다
+    if (token && response.status === 401 && data.code === 'AUTH_EXPIRED') {
+      window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT))
+    }
     const error = new Error(data.message || 'Request failed')
     error.status = response.status
     error.data = data

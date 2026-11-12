@@ -1,6 +1,6 @@
 import { createContext, useEffect, useState } from 'react'
 import { loginRequest, signupRequest } from '../api/auth'
-import { apiFetch } from '../api/client'
+import { apiFetch, AUTH_EXPIRED_EVENT } from '../api/client'
 
 const AuthContext = createContext(null)
 
@@ -11,8 +11,11 @@ export function AuthProvider({ children }) {
     return storedUser ? JSON.parse(storedUser) : null
   })
   const [loading, setLoading] = useState(false)
+  // 로그인이 만료돼 자동으로 로그아웃됐을 때 로그인 화면에 안내를 띄운다
+  const [expired, setExpired] = useState(false)
 
   function persist(tok, usr) {
+    if (tok) setExpired(false)
     if (tok) localStorage.setItem('token', tok)
     else localStorage.removeItem('token')
     if (usr) localStorage.setItem('user', JSON.stringify(usr))
@@ -49,6 +52,16 @@ export function AuthProvider({ children }) {
     persist(null, null)
   }
 
+  useEffect(() => {
+    function onExpired() {
+      if (!localStorage.getItem('token')) return
+      logout()
+      setExpired(true)
+    }
+    window.addEventListener(AUTH_EXPIRED_EVENT, onExpired)
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired)
+  })
+
   function markPasswordChanged() {
     persist(token, user ? { ...user, mustChangePassword: false } : user)
   }
@@ -63,6 +76,7 @@ export function AuthProvider({ children }) {
         signup,
         logout,
         markPasswordChanged,
+        expired,
         isAuthenticated: Boolean(token),
       }}
     >
